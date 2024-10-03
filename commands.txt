@@ -1,0 +1,56 @@
+python -m venv venv
+source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+
+
+pip install -r requirements.txt
+
+
+
+
+
+
+PSQL Login
+
+psql -U postgres -h localhost -p 5432
+
+
+Database Creati
+-- Create a new database
+CREATE DATABASE insightpilot;
+
+-- Create a new user
+CREATE USER new_username WITH PASSWORD 'new_password';
+
+-- Grant privileges to the new user
+GRANT ALL PRIVILEGES ON DATABASE insightpilot TO new_username;
+
+-- Connect to the new database
+\c insightpilot
+
+-- Create the datasets table
+CREATE TABLE datasets (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    file_format VARCHAR(10) NOT NULL,
+    file_size INTEGER NOT NULL,
+    upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data BYTEA NOT NULL
+);
+
+-- Grant privileges on the datasets table to the new user
+GRANT ALL PRIVILEGES ON TABLE datasets TO new_username;
+
+
+GRANT USAGE, SELECT ON SEQUENCE datasets_id_seq TO new_username;
+
+
+GRANT INSERT ON TABLE datasets TO new_username;
+
+
+ALTER TABLE datasets ADD COLUMN last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+
+-- Exit psql
+\q
+
+
