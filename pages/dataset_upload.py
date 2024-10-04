@@ -181,10 +181,28 @@ def dataset_upload_page():
                         with col5:
                             st.write(f"{ds.last_accessed.strftime('%Y-%m-%d %H:%M:%S')}")
                         with col6:
+                        #     action_key = f"action_{ds.id}"
+                        #     action = st.selectbox("", ["Select", "View Summary", "Preprocessing", "Visualization", "Chat", "Share", "Rename", "Delete"], key=action_key, index=st.session_state.rename_action_state.get(ds.id, 0))
+                        #     if action == "View Summary":
+                        #         view_dataset_summary(ds.id)
+                        #                         with col6:
                             action_key = f"action_{ds.id}"
-                            action = st.selectbox("", ["Select", "View Summary", "Preprocessing", "Visualization", "Chat", "Share", "Rename", "Delete"], key=action_key, index=st.session_state.rename_action_state.get(ds.id, 0))
+                            action = st.selectbox(
+                                "", 
+                                ["Select", "View Summary", "Preprocessing", "Visualization", "Chat", "Share", "Rename", "Delete"], 
+                                key=action_key, 
+                                index=st.session_state.rename_action_state.get(ds.id, 0)
+                            )
+
+                            # Handling actions
                             if action == "View Summary":
                                 view_dataset_summary(ds.id)
+                            elif action == "Preprocessing":
+                                dataset = dataset_db.get_dataset_by_id(ds.id)  # Fetch dataset by id
+                                st.session_state.df_to_preprocess = dataset.data  # Ensure dataset is stored
+                                st.session_state.dataset_name_to_preprocess = dataset.name  # Store dataset name
+                                st.session_state.dataset_id_to_preprocess = ds.id  # Store dataset ID
+                                st.switch_page("pages/data_preprocessing.py")
                             elif action == "Delete":
                                 delete_dataset(ds.id)
                             elif action == "Rename":
@@ -204,7 +222,7 @@ def dataset_upload_page():
             st.write("You don't have any datasets uploaded. Please upload a dataset to get started.")
 
 def view_dataset_summary(dataset_id):
-    dataset = dataset_db.get_dataset_by_id(dataset_id)
+    dataset = dataset_db.get_dataset_by_id(dataset_id)  # Fetch the dataset by ID
     if dataset:
         data = dataset.data
         file_format = dataset.file_format
@@ -222,6 +240,7 @@ def view_dataset_summary(dataset_id):
                 return
         st.session_state.df = df
         st.session_state.dataset_name = dataset.name
+        st.session_state.dataset_id = dataset_id  # Make sure dataset_id is set in session state
         dataset_db.update_last_accessed(dataset_id)
         st.switch_page("pages/dataset_summary.py")
 

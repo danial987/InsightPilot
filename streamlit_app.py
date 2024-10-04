@@ -7,7 +7,7 @@ def load_css():
         css_code = f.read()
     st.markdown(f'<style>{css_code}</style>', unsafe_allow_html=True)
 
-st.set_page_config(page_title="InsightPilot", page_icon="🧠")
+st.set_page_config(page_title="InsightPilot", page_icon="👾")
 
 st.sidebar.image("static/logo.png", width=200) 
 

@@ -338,6 +338,7 @@ class DatasetSummary:
                 st.dataframe(df)
 
 
+# In dataset_summary_page, update dataset_id_to_preprocess correctly
 def dataset_summary_page():
     load_css()
     st.header('Dataset Summary', divider='violet')
@@ -355,7 +356,12 @@ def dataset_summary_page():
                 st.switch_page("pages/dataset_upload.py")
         with col2:
             if st.button("Go to Preprocessing", key="go_to_preprocessing"):
+                st.session_state.df_to_preprocess = st.session_state.df  # Store the dataframe in session state
+                st.session_state.dataset_name_to_preprocess = st.session_state.dataset_name  # Store the name
+                st.session_state.dataset_id_to_preprocess = st.session_state.dataset_id  # Ensure dataset ID is passed here
                 st.switch_page("pages/data_preprocessing.py")
+
+
 
 
 dataset_summary_page()

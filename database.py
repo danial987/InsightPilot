@@ -1,3 +1,4 @@
+import io  # Ensure you import io to handle in-memory binary streams
 import pandas as pd
 import json
 from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData, LargeBinary, DateTime, Index
@@ -73,6 +74,8 @@ class Dataset:
         print(f"Get operation took {time.time() - start_time} seconds")
         return result
 
+
+   
     def update_last_accessed(self, dataset_id):
         start_time = time.time()
         self.session.execute(self.datasets.update().where(self.datasets.c.id == dataset_id).values(last_accessed=datetime.datetime.utcnow()))
