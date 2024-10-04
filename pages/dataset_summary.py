@@ -145,179 +145,187 @@ class DatasetSummary:
         # Numerical Features Analysis
         with st.container(border=True):
             st.subheader("Numerical Features Analysis")
-            num_tab1, num_tab2, num_tab3, num_tab4, num_tab5, num_tab6, num_tab7, num_tab8, num_tab9, num_tab10 = st.tabs([
-                "Feature Names",
-                "Missing Values",
-                "Unique Values",
-                "Most Frequent Values",
-                "Data Types",
-                "Memory Usage",
-                "Basic Statistics",
-                "Correlation Matrix",
-                "Distribution",
-                "Histograms & Box Plots"
-            ])
 
-            with num_tab1:
-                st.write("##### Feature Names")
-                st.write(numerical_features)
+            if numerical_features:
+                num_tab1, num_tab2, num_tab3, num_tab4, num_tab5, num_tab6, num_tab7, num_tab8, num_tab9, num_tab10 = st.tabs([
+                    "Feature Names",
+                    "Missing Values",
+                    "Unique Values",
+                    "Most Frequent Values",
+                    "Data Types",
+                    "Memory Usage",
+                    "Basic Statistics",
+                    "Correlation Matrix",
+                    "Distribution",
+                    "Histograms & Box Plots"
+                ])
 
-            with num_tab2:
-                st.write("##### Missing Values")
-                missing_tab1, missing_tab2 = st.tabs(["Table", "Visualization"])
-                with missing_tab1:
-                    missing_values = df[numerical_features].isnull().sum().reset_index()
-                    missing_values.columns = ['Feature', 'Missing Values']
-                    missing_values['Percentage'] = (missing_values['Missing Values'] / df.shape[0]) * 100
-                    st.write(missing_values)
-                with missing_tab2:
-                    fig = px.bar(missing_values, x='Feature', y='Missing Values', title='Missing Values Count', color_discrete_sequence=["#9933FF"])
-                    st.plotly_chart(fig, use_container_width=True)
+                with num_tab1:
+                    st.write("##### Feature Names")
+                    st.write(numerical_features)
 
-            with num_tab3:
-                st.write("##### Unique Values")
-                unique_tab1, unique_tab2 = st.tabs(["Table", "Visualization"])
-                with unique_tab1:
-                    # Convert non-hashable types to strings
-                    unique_values = df[numerical_features].applymap(lambda x: str(x) if not is_hashable(x) else x).nunique().reset_index()
-                    unique_values.columns = ['Feature', 'Unique Values']
-                    st.write(unique_values)
-                with unique_tab2:
-                    fig = px.bar(unique_values, x='Feature', y='Unique Values', title='Unique Values Count', color_discrete_sequence=["#9933FF"])
-                    st.plotly_chart(fig, use_container_width=True)
+                with num_tab2:
+                    st.write("##### Missing Values")
+                    missing_tab1, missing_tab2 = st.tabs(["Table", "Visualization"])
+                    with missing_tab1:
+                        missing_values = df[numerical_features].isnull().sum().reset_index()
+                        missing_values.columns = ['Feature', 'Missing Values']
+                        missing_values['Percentage'] = (missing_values['Missing Values'] / df.shape[0]) * 100
+                        st.write(missing_values)
+                    with missing_tab2:
+                        fig = px.bar(missing_values, x='Feature', y='Missing Values', title='Missing Values Count', color_discrete_sequence=["#9933FF"])
+                        st.plotly_chart(fig, use_container_width=True)
 
-            with num_tab4:
-                st.write("##### Most Frequent Values")
-                most_frequent_values = df[numerical_features].mode().iloc[0].reset_index()
-                most_frequent_values.columns = ['Feature', 'Most Frequent Value']
-                st.write(most_frequent_values)
+                with num_tab3:
+                    st.write("##### Unique Values")
+                    unique_tab1, unique_tab2 = st.tabs(["Table", "Visualization"])
+                    with unique_tab1:
+                        # Convert non-hashable types to strings
+                        unique_values = df[numerical_features].applymap(lambda x: str(x) if not is_hashable(x) else x).nunique().reset_index()
+                        unique_values.columns = ['Feature', 'Unique Values']
+                        st.write(unique_values)
+                    with unique_tab2:
+                        fig = px.bar(unique_values, x='Feature', y='Unique Values', title='Unique Values Count', color_discrete_sequence=["#9933FF"])
+                        st.plotly_chart(fig, use_container_width=True)
 
-            with num_tab5:
-                st.write("##### Data Types")
-                data_types = df[numerical_features].dtypes.reset_index()
-                data_types.columns = ['Feature', 'Data Type']
-                st.write(data_types)
+                with num_tab4:
+                    st.write("##### Most Frequent Values")
+                    most_frequent_values = df[numerical_features].mode().iloc[0].reset_index()
+                    most_frequent_values.columns = ['Feature', 'Most Frequent Value']
+                    st.write(most_frequent_values)
 
-            with num_tab6:
-                st.write("##### Memory Usage")
-                memory_tab1, memory_tab2 = st.tabs(["Table", "Visualization"])
-                with memory_tab1:
-                    memory_usage = df[numerical_features].memory_usage(deep=True).reset_index()
-                    memory_usage.columns = ['Feature', 'Memory Usage (Bytes)']
-                    st.write(memory_usage)
-                with memory_tab2:
-                    fig = px.bar(memory_usage, x='Feature', y='Memory Usage (Bytes)', title='Memory Usage', color_discrete_sequence=["#9933FF"])
-                    st.plotly_chart(fig, use_container_width=True)
+                with num_tab5:
+                    st.write("##### Data Types")
+                    data_types = df[numerical_features].dtypes.reset_index()
+                    data_types.columns = ['Feature', 'Data Type']
+                    st.write(data_types)
 
-            with num_tab7:
-                st.write("##### Basic Statistics")
-                if not df[numerical_features].empty:
-                    st.write(df[numerical_features].describe())
-                else:
-                    st.write("No numerical columns found or DataFrame is empty.")
+                with num_tab6:
+                    st.write("##### Memory Usage")
+                    memory_tab1, memory_tab2 = st.tabs(["Table", "Visualization"])
+                    with memory_tab1:
+                        memory_usage = df[numerical_features].memory_usage(deep=True).reset_index()
+                        memory_usage.columns = ['Feature', 'Memory Usage (Bytes)']
+                        st.write(memory_usage)
+                    with memory_tab2:
+                        fig = px.bar(memory_usage, x='Feature', y='Memory Usage (Bytes)', title='Memory Usage', color_discrete_sequence=["#9933FF"])
+                        st.plotly_chart(fig, use_container_width=True)
 
-            with num_tab8:
-                st.write("##### Correlation Matrix")
-                if len(numerical_features) > 1:
-                    corr_matrix = df[numerical_features].corr()
-                    fig = px.imshow(corr_matrix, text_auto=True, aspect="auto", color_continuous_scale="Viridis")
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.write("Not enough numerical columns for correlation matrix.")
+                with num_tab7:
+                    st.write("##### Basic Statistics")
+                    if not df[numerical_features].empty:
+                        st.write(df[numerical_features].describe())
+                    else:
+                        st.write("No numerical columns found or DataFrame is empty.")
 
-            with num_tab9:
-                st.write("##### Distribution")
-                skew_tab, kurtosis_tab = st.tabs(["Skewness", "Kurtosis"])
-                with skew_tab:
-                    for feature in numerical_features:
-                        skewness = df[feature].skew()
-                        st.write(f"**{feature}**: {skewness}")
+                with num_tab8:
+                    st.write("##### Correlation Matrix")
+                    if len(numerical_features) > 1:
+                        corr_matrix = df[numerical_features].corr()
+                        fig = px.imshow(corr_matrix, text_auto=True, aspect="auto", color_continuous_scale="Viridis")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.write("Not enough numerical columns for correlation matrix.")
 
-                with kurtosis_tab:
-                    for feature in numerical_features:
-                        kurtosis = df[feature].kurtosis()
-                        st.write(f"**{feature}**: {kurtosis}")
+                with num_tab9:
+                    st.write("##### Distribution")
+                    skew_tab, kurtosis_tab = st.tabs(["Skewness", "Kurtosis"])
+                    with skew_tab:
+                        for feature in numerical_features:
+                            skewness = df[feature].skew()
+                            st.write(f"**{feature}**: {skewness}")
 
-            with num_tab10:
-                st.write("##### Histograms & Box Plots")
-                feature_tabs = st.tabs(numerical_features)
-                for feature, tab in zip(numerical_features, feature_tabs):
-                    with tab:
-                        st.write(f"### {feature}")
-                        hist_fig = px.histogram(df, x=feature, nbins=30, marginal="box", title=f"Histogram and Box Plot for {feature}", color_discrete_sequence=["#9933FF"])
-                        st.plotly_chart(hist_fig, use_container_width=True)
+                    with kurtosis_tab:
+                        for feature in numerical_features:
+                            kurtosis = df[feature].kurtosis()
+                            st.write(f"**{feature}**: {kurtosis}")
+
+                with num_tab10:
+                    st.write("##### Histograms & Box Plots")
+                    feature_tabs = st.tabs(numerical_features)
+                    for feature, tab in zip(numerical_features, feature_tabs):
+                        with tab:
+                            st.write(f"### {feature}")
+                            hist_fig = px.histogram(df, x=feature, nbins=30, marginal="box", title=f"Histogram and Box Plot for {feature}", color_discrete_sequence=["#9933FF"])
+                            st.plotly_chart(hist_fig, use_container_width=True)
+            else:
+                st.write("No numerical features found in the dataset.")
 
         # Categorical Features Analysis
         with st.container(border=True):
             st.subheader("Categorical Features Analysis")
-            cat_tab1, cat_tab2, cat_tab3, cat_tab4, cat_tab5, cat_tab6, cat_tab7 = st.tabs([
-                "Feature Names",
-                "Missing Values",
-                "Unique Values",
-                "Value Counts",
-                "Data Types",
-                "Top Frequent Categories",
-                "Top N Categories"
-            ])
 
-            with cat_tab1:
-                st.write("##### Feature Names")
-                st.write(categorical_features)
+            if categorical_features:
+                cat_tab1, cat_tab2, cat_tab3, cat_tab4, cat_tab5, cat_tab6, cat_tab7 = st.tabs([
+                    "Feature Names",
+                    "Missing Values",
+                    "Unique Values",
+                    "Value Counts",
+                    "Data Types",
+                    "Top Frequent Categories",
+                    "Top N Categories"
+                ])
 
-            with cat_tab2:
-                st.write("##### Missing Values")
-                missing_tab1, missing_tab2 = st.tabs(["Table", "Visualization"])
-                with missing_tab1:
-                    missing_values = df[categorical_features].isnull().sum().reset_index()
-                    missing_values.columns = ['Feature', 'Missing Values']
-                    missing_values['Percentage'] = (missing_values['Missing Values'] / df.shape[0]) * 100
-                    st.write(missing_values)
-                with missing_tab2:
-                    fig = px.bar(missing_values, x='Feature', y='Missing Values', title='Missing Values Count', color_discrete_sequence=["#9933FF"])
-                    st.plotly_chart(fig, use_container_width=True)
+                with cat_tab1:
+                    st.write("##### Feature Names")
+                    st.write(categorical_features)
 
-            with cat_tab3:
-                st.write("##### Unique Values")
-                unique_tab1, unique_tab2 = st.tabs(["Table", "Visualization"])
-                with unique_tab1:
-                    # Convert non-hashable types to strings
-                    unique_values = df[categorical_features].applymap(lambda x: str(x) if not is_hashable(x) else x).nunique().reset_index()
-                    unique_values.columns = ['Feature', 'Unique Values']
-                    st.write(unique_values)
-                with unique_tab2:
-                    fig = px.bar(unique_values, x='Feature', y='Unique Values', title='Unique Values Count', color_discrete_sequence=["#9933FF"])
-                    st.plotly_chart(fig, use_container_width=True)
-
-            with cat_tab4:
-                st.write("##### Value Counts")
-                value_tabs = st.tabs(categorical_features)
-                for feature, tab in zip(categorical_features, value_tabs):
-                    with tab:
-                        st.write(df[feature].value_counts())
-
-            with cat_tab5:
-                st.write("##### Data Types")
-                data_types = df[categorical_features].dtypes.reset_index()
-                data_types.columns = ['Feature', 'Data Type']
-                st.write(data_types)
-
-            with cat_tab6:
-                st.write("##### Top Frequent Categories")
-                for feature in categorical_features:
-                    st.write(f"**{feature}**: {df[feature].value_counts().idxmax()} (Most Frequent)")
-
-            with cat_tab7:
-                st.write("##### Top N Categories")
-                top_n = st.slider("Select Top N", min_value=1, max_value=20, value=5)
-                feature_tabs = st.tabs(categorical_features)
-                for feature, tab in zip(categorical_features, feature_tabs):
-                    with tab:
-                        st.write(f"### Top {top_n} Categories for {feature}")
-                        value_counts = df[feature].value_counts().head(top_n)
-                        value_counts = value_counts.reset_index()  # Reset index to get a DataFrame
-                        value_counts.columns = ['Category', 'Count']  # Rename the columns for clarity
-                        fig = px.bar(value_counts, x='Category', y='Count', title=f"Top {top_n} Categories for {feature}", color_discrete_sequence=["#9933FF"])
+                with cat_tab2:
+                    st.write("##### Missing Values")
+                    missing_tab1, missing_tab2 = st.tabs(["Table", "Visualization"])
+                    with missing_tab1:
+                        missing_values = df[categorical_features].isnull().sum().reset_index()
+                        missing_values.columns = ['Feature', 'Missing Values']
+                        missing_values['Percentage'] = (missing_values['Missing Values'] / df.shape[0]) * 100
+                        st.write(missing_values)
+                    with missing_tab2:
+                        fig = px.bar(missing_values, x='Feature', y='Missing Values', title='Missing Values Count', color_discrete_sequence=["#9933FF"])
                         st.plotly_chart(fig, use_container_width=True)
+
+                with cat_tab3:
+                    st.write("##### Unique Values")
+                    unique_tab1, unique_tab2 = st.tabs(["Table", "Visualization"])
+                    with unique_tab1:
+                        # Convert non-hashable types to strings
+                        unique_values = df[categorical_features].applymap(lambda x: str(x) if not is_hashable(x) else x).nunique().reset_index()
+                        unique_values.columns = ['Feature', 'Unique Values']
+                        st.write(unique_values)
+                    with unique_tab2:
+                        fig = px.bar(unique_values, x='Feature', y='Unique Values', title='Unique Values Count', color_discrete_sequence=["#9933FF"])
+                        st.plotly_chart(fig, use_container_width=True)
+
+                with cat_tab4:
+                    st.write("##### Value Counts")
+                    value_tabs = st.tabs(categorical_features)
+                    for feature, tab in zip(categorical_features, value_tabs):
+                        with tab:
+                            st.write(df[feature].value_counts())
+
+                with cat_tab5:
+                    st.write("##### Data Types")
+                    data_types = df[categorical_features].dtypes.reset_index()
+                    data_types.columns = ['Feature', 'Data Type']
+                    st.write(data_types)
+
+                with cat_tab6:
+                    st.write("##### Top Frequent Categories")
+                    for feature in categorical_features:
+                        st.write(f"**{feature}**: {df[feature].value_counts().idxmax()} (Most Frequent)")
+
+                with cat_tab7:
+                    st.write("##### Top N Categories")
+                    top_n = st.slider("Select Top N", min_value=1, max_value=20, value=5)
+                    feature_tabs = st.tabs(categorical_features)
+                    for feature, tab in zip(categorical_features, feature_tabs):
+                        with tab:
+                            st.write(f"### Top {top_n} Categories for {feature}")
+                            value_counts = df[feature].value_counts().head(top_n)
+                            value_counts = value_counts.reset_index()  # Reset index to get a DataFrame
+                            value_counts.columns = ['Category', 'Count']  # Rename the columns for clarity
+                            fig = px.bar(value_counts, x='Category', y='Count', title=f"Top {top_n} Categories for {feature}", color_discrete_sequence=["#9933FF"])
+                            st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.write("No categorical features found in the dataset.")
 
         # Data Overview
         with st.container(border=True):
@@ -360,8 +368,6 @@ def dataset_summary_page():
                 st.session_state.dataset_name_to_preprocess = st.session_state.dataset_name  # Store the name
                 st.session_state.dataset_id_to_preprocess = st.session_state.dataset_id  # Ensure dataset ID is passed here
                 st.switch_page("pages/data_preprocessing.py")
-
-
 
 
 dataset_summary_page()

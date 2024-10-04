@@ -41,6 +41,13 @@ def categorize_by_time(datasets):
 
     return categorized
 
+def format_file_size(file_size_bytes):
+    """Helper function to display file size in KB or MB"""
+    if file_size_bytes < 1024 * 1024:  # Less than 1 MB
+        return f"{round(file_size_bytes / 1024, 2)} KB"
+    else:
+        return f"{round(file_size_bytes / (1024 * 1024), 2)} MB"
+
 def dataset_upload_page():
     load_css()
     st.header('Upload your dataset', divider='violet')
@@ -177,15 +184,10 @@ def dataset_upload_page():
                         with col3:
                             st.write(f"{ds.file_format.upper()}")
                         with col4:
-                            st.write(f"{round(ds.file_size / (1024 * 1024), 2)} MB")
+                            st.write(f"{format_file_size(ds.file_size)}")  # Updated line to show size in KB/MB
                         with col5:
                             st.write(f"{ds.last_accessed.strftime('%Y-%m-%d %H:%M:%S')}")
                         with col6:
-                        #     action_key = f"action_{ds.id}"
-                        #     action = st.selectbox("", ["Select", "View Summary", "Preprocessing", "Visualization", "Chat", "Share", "Rename", "Delete"], key=action_key, index=st.session_state.rename_action_state.get(ds.id, 0))
-                        #     if action == "View Summary":
-                        #         view_dataset_summary(ds.id)
-                        #                         with col6:
                             action_key = f"action_{ds.id}"
                             action = st.selectbox(
                                 "", 

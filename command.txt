@@ -1,4 +1,0 @@
-ALTER TABLE datasets ADD COLUMN last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-
-
-streamlit run streamlit_app.py
