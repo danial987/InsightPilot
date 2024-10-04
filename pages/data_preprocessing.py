@@ -1,20 +1,18 @@
 import streamlit as st
 import pandas as pd
-import io  # For StringIO
+import io
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, MaxAbsScaler, LabelEncoder
-from sklearn.impute import SimpleImputer  # For handling missing values
-from sklearn.ensemble import IsolationForest  # For handling outliers
+from sklearn.impute import SimpleImputer  
+from sklearn.ensemble import IsolationForest  
 from imblearn.over_sampling import SMOTE
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.combine import SMOTEENN
 from database import Dataset
 
-# Interface for preprocessing strategy
 class IPreprocessingStrategy:
     def apply(self, df: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError("Preprocessing strategies must implement the apply method.")
 
-# Context class for dataset preprocessing
 class PreprocessDataset:
     def __init__(self, strategy: IPreprocessingStrategy):
         self._strategy = strategy
@@ -24,7 +22,6 @@ class PreprocessDataset:
 
     def apply_preprocessing(self, df: pd.DataFrame) -> pd.DataFrame:
         return self._strategy.apply(df)
-
 
 class RemoveDuplicates(IPreprocessingStrategy):
     def apply(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -114,7 +111,6 @@ class FillMissingValues(IPreprocessingStrategy):
 
         return df if 'df_preprocessed' not in st.session_state else st.session_state['df_preprocessed']
 
-# Concrete strategy: Scale Features (Unchanged)
 class ScaleFeatures(IPreprocessingStrategy):
     def apply(self, df: pd.DataFrame) -> pd.DataFrame:
         numerical_columns = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
@@ -163,7 +159,6 @@ class ScaleFeatures(IPreprocessingStrategy):
 
         return df if 'df_preprocessed' not in st.session_state else st.session_state['df_preprocessed']
 
-# New Concrete strategy: Encode Data (without Target Encoding)
 class EncodeData(IPreprocessingStrategy):
     def apply(self, df: pd.DataFrame) -> pd.DataFrame:
         categorical_columns = df.select_dtypes(include=['object', 'category']).columns.tolist()
@@ -215,7 +210,6 @@ class EncodeData(IPreprocessingStrategy):
 
         return df if 'df_preprocessed' not in st.session_state else st.session_state['df_preprocessed']
 
-# Concrete strategy: Handle Imbalanced Data
 class HandleImbalancedData(IPreprocessingStrategy):
     def apply(self, df: pd.DataFrame) -> pd.DataFrame:
         @st.dialog("Handle Imbalanced Data")
@@ -228,29 +222,25 @@ class HandleImbalancedData(IPreprocessingStrategy):
                 st.error("Please select a valid target column.")
                 return df
 
-            X = df.drop(columns=[target_column])  # Features
-            y = df[target_column]  # Target
+            X = df.drop(columns=[target_column]) 
+            y = df[target_column] 
 
-            # Handle missing values
             imputer_num = SimpleImputer(strategy='median')
             imputer_cat = SimpleImputer(strategy='most_frequent')
 
             for col in X.columns:
-                if X[col].dtype in ['int64', 'float64']:  # Numerical columns
-                    X[col] = imputer_num.fit_transform(X[[col]])  # Ensure numerical column is imputed
-                else:  # Categorical columns
+                if X[col].dtype in ['int64', 'float64']:  
+                    X[col] = imputer_num.fit_transform(X[[col]])  
+                else: 
                     label_enc = LabelEncoder()
-                    X[col] = imputer_cat.fit_transform(X[[col]]).ravel()  # Ensure 1D array is returned
-                    X[col] = label_enc.fit_transform(X[col])  # Encode categorical data
+                    X[col] = imputer_cat.fit_transform(X[[col]]).ravel() 
+                    X[col] = label_enc.fit_transform(X[col]) 
 
-            # Choose balancing method
             balancing_method = st.selectbox("Choose balancing method", ["Oversampling (SMOTE)", "Undersampling", "Combination (SMOTE + Undersampling)"],
                                             help="Choose how to handle imbalanced data.")
 
-            # Handling k_neighbors based on the minority class size
             minority_class_size = y.value_counts().min()
 
-            # Ensure k_neighbors is not less than 1
             k_neighbors = max(min(minority_class_size - 1, 1), 1)
 
             balanced_X, balanced_y = X, y
@@ -259,7 +249,7 @@ class HandleImbalancedData(IPreprocessingStrategy):
                 if minority_class_size <= 1:
                     st.warning("SMOTE requires at least 2 samples in the minority class. Consider another method.")
                 else:
-                    smote = SMOTE(k_neighbors=min(k_neighbors, minority_class_size - 1))  # Ensure k_neighbors does not exceed minority class size
+                    smote = SMOTE(k_neighbors=min(k_neighbors, minority_class_size - 1)) 
                     balanced_X, balanced_y = smote.fit_resample(X, y)
             elif balancing_method == "Undersampling":
                 undersample = RandomUnderSampler()
@@ -271,7 +261,6 @@ class HandleImbalancedData(IPreprocessingStrategy):
                     smote_enn = SMOTEENN(smote=SMOTE(k_neighbors=min(k_neighbors, minority_class_size - 1)))
                     balanced_X, balanced_y = smote_enn.fit_resample(X, y)
 
-            # Combine resampled X and y into a single dataframe
             balanced_df = pd.concat([pd.DataFrame(balanced_X, columns=X.columns), pd.DataFrame(balanced_y, columns=[target_column])], axis=1)
 
             if st.button("Apply Balancing"):
@@ -290,10 +279,6 @@ class HandleImbalancedData(IPreprocessingStrategy):
 
         return df if 'df_preprocessed' not in st.session_state else st.session_state['df_preprocessed']
 
-# New Concrete strategy: Outlier Handling (with missing value check)
-# Updated OutlierHandling strategy with robust NaN handling
-
-# Updated OutlierHandling strategy with robust NaN handling
 class OutlierHandling(IPreprocessingStrategy):
     def apply(self, df: pd.DataFrame) -> pd.DataFrame:
         numerical_columns = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
@@ -302,7 +287,6 @@ class OutlierHandling(IPreprocessingStrategy):
             st.warning("This dataset has no numerical columns to check for outliers.")
             return df
 
-        # Check for missing values in numerical columns
         if df[numerical_columns].isnull().values.any():
             st.error("The dataset contains missing values. Please handle missing values before performing outlier detection.")
             return df
@@ -321,14 +305,13 @@ class OutlierHandling(IPreprocessingStrategy):
                 contamination = st.slider("Contamination (percentage of data expected to be outliers)", 0.01, 0.5, 0.1)
                 isolation_forest = IsolationForest(contamination=contamination, random_state=42)
 
-                # **Make sure all missing values are filled**
-                outliers = isolation_forest.fit_predict(outlier_df[numerical_columns].fillna(0))  # Temporary fill with 0 or other value
-                outlier_df = outlier_df[outliers == 1]  # Keep only non-outliers
+                outliers = isolation_forest.fit_predict(outlier_df[numerical_columns].fillna(0))
+                outlier_df = outlier_df[outliers == 1] 
 
             elif method == "Z-Score":
                 threshold = st.slider("Z-Score Threshold", 1.0, 5.0, 3.0)
                 z_scores = (df[numerical_columns] - df[numerical_columns].mean()) / df[numerical_columns].std()
-                outlier_df = outlier_df[(z_scores.abs() < threshold).all(axis=1)]  # Keep only rows within threshold
+                outlier_df = outlier_df[(z_scores.abs() < threshold).all(axis=1)]
 
             if st.button("Apply Outlier Handling"):
                 st.success(f"Outlier handling using {method} has been applied.")
@@ -346,8 +329,6 @@ class OutlierHandling(IPreprocessingStrategy):
 
         return df if 'df_preprocessed' not in st.session_state else st.session_state['df_preprocessed']
    
-
-# Main page for preprocessing
 def load_css():
     with open('static/style.css') as f:
         css_code = f.read()
