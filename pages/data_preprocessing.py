@@ -2,7 +2,11 @@ import streamlit as st
 import pandas as pd
 import io  # For StringIO
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, MaxAbsScaler, LabelEncoder
-from category_encoders import BinaryEncoder  # For Binary Encoding
+from sklearn.impute import SimpleImputer  # For handling missing values
+from sklearn.ensemble import IsolationForest  # For handling outliers
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import RandomUnderSampler
+from imblearn.combine import SMOTEENN
 from database import Dataset
 
 # Interface for preprocessing strategy
@@ -20,6 +24,7 @@ class PreprocessDataset:
 
     def apply_preprocessing(self, df: pd.DataFrame) -> pd.DataFrame:
         return self._strategy.apply(df)
+
 
 class RemoveDuplicates(IPreprocessingStrategy):
     def apply(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -210,8 +215,139 @@ class EncodeData(IPreprocessingStrategy):
 
         return df if 'df_preprocessed' not in st.session_state else st.session_state['df_preprocessed']
 
+# Concrete strategy: Handle Imbalanced Data
+class HandleImbalancedData(IPreprocessingStrategy):
+    def apply(self, df: pd.DataFrame) -> pd.DataFrame:
+        @st.dialog("Handle Imbalanced Data")
+        def show_handle_imbalanced_dialog():
+            st.write("### Imbalanced Data Handling")
 
-# Main page for preprocessing (Unchanged)
+            target_column = st.selectbox("Select the target column", df.columns, help="This column will be used as the class label for balancing.")
+
+            if target_column not in df.columns:
+                st.error("Please select a valid target column.")
+                return df
+
+            X = df.drop(columns=[target_column])  # Features
+            y = df[target_column]  # Target
+
+            # Handle missing values
+            imputer_num = SimpleImputer(strategy='median')
+            imputer_cat = SimpleImputer(strategy='most_frequent')
+
+            for col in X.columns:
+                if X[col].dtype in ['int64', 'float64']:  # Numerical columns
+                    X[col] = imputer_num.fit_transform(X[[col]])  # Ensure numerical column is imputed
+                else:  # Categorical columns
+                    label_enc = LabelEncoder()
+                    X[col] = imputer_cat.fit_transform(X[[col]]).ravel()  # Ensure 1D array is returned
+                    X[col] = label_enc.fit_transform(X[col])  # Encode categorical data
+
+            # Choose balancing method
+            balancing_method = st.selectbox("Choose balancing method", ["Oversampling (SMOTE)", "Undersampling", "Combination (SMOTE + Undersampling)"],
+                                            help="Choose how to handle imbalanced data.")
+
+            # Handling k_neighbors based on the minority class size
+            minority_class_size = y.value_counts().min()
+
+            # Ensure k_neighbors is not less than 1
+            k_neighbors = max(min(minority_class_size - 1, 1), 1)
+
+            balanced_X, balanced_y = X, y
+
+            if balancing_method == "Oversampling (SMOTE)":
+                if minority_class_size <= 1:
+                    st.warning("SMOTE requires at least 2 samples in the minority class. Consider another method.")
+                else:
+                    smote = SMOTE(k_neighbors=min(k_neighbors, minority_class_size - 1))  # Ensure k_neighbors does not exceed minority class size
+                    balanced_X, balanced_y = smote.fit_resample(X, y)
+            elif balancing_method == "Undersampling":
+                undersample = RandomUnderSampler()
+                balanced_X, balanced_y = undersample.fit_resample(X, y)
+            elif balancing_method == "Combination (SMOTE + Undersampling)":
+                if minority_class_size <= 1:
+                    st.warning("SMOTE requires at least 2 samples in the minority class. Consider another method.")
+                else:
+                    smote_enn = SMOTEENN(smote=SMOTE(k_neighbors=min(k_neighbors, minority_class_size - 1)))
+                    balanced_X, balanced_y = smote_enn.fit_resample(X, y)
+
+            # Combine resampled X and y into a single dataframe
+            balanced_df = pd.concat([pd.DataFrame(balanced_X, columns=X.columns), pd.DataFrame(balanced_y, columns=[target_column])], axis=1)
+
+            if st.button("Apply Balancing"):
+                st.success(f"{balancing_method} has been applied.")
+                st.session_state['df_preprocessed'] = balanced_df
+                st.session_state['imbalanced_data_handled'] = True
+                st.session_state['show_before_after_button'] = True
+                st.session_state['show_save_button'] = True
+                st.session_state['show_handle_imbalanced_dialog'] = False
+
+        if 'show_handle_imbalanced_dialog' not in st.session_state:
+            st.session_state['show_handle_imbalanced_dialog'] = True
+
+        if st.session_state['show_handle_imbalanced_dialog']:
+            show_handle_imbalanced_dialog()
+
+        return df if 'df_preprocessed' not in st.session_state else st.session_state['df_preprocessed']
+
+# New Concrete strategy: Outlier Handling (with missing value check)
+# Updated OutlierHandling strategy with robust NaN handling
+
+# Updated OutlierHandling strategy with robust NaN handling
+class OutlierHandling(IPreprocessingStrategy):
+    def apply(self, df: pd.DataFrame) -> pd.DataFrame:
+        numerical_columns = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+
+        if not numerical_columns:
+            st.warning("This dataset has no numerical columns to check for outliers.")
+            return df
+
+        # Check for missing values in numerical columns
+        if df[numerical_columns].isnull().values.any():
+            st.error("The dataset contains missing values. Please handle missing values before performing outlier detection.")
+            return df
+
+        @st.dialog("Handle Outliers")
+        def show_outlier_handling_dialog():
+            st.write("### Outlier Handling")
+            st.write("Numerical columns being analyzed for outliers:")
+            st.write(numerical_columns)
+
+            method = st.selectbox("Select outlier detection method", ["Isolation Forest", "Z-Score"], 
+                                  help="Choose the method for detecting outliers.")
+            outlier_df = df.copy()
+
+            if method == "Isolation Forest":
+                contamination = st.slider("Contamination (percentage of data expected to be outliers)", 0.01, 0.5, 0.1)
+                isolation_forest = IsolationForest(contamination=contamination, random_state=42)
+
+                # **Make sure all missing values are filled**
+                outliers = isolation_forest.fit_predict(outlier_df[numerical_columns].fillna(0))  # Temporary fill with 0 or other value
+                outlier_df = outlier_df[outliers == 1]  # Keep only non-outliers
+
+            elif method == "Z-Score":
+                threshold = st.slider("Z-Score Threshold", 1.0, 5.0, 3.0)
+                z_scores = (df[numerical_columns] - df[numerical_columns].mean()) / df[numerical_columns].std()
+                outlier_df = outlier_df[(z_scores.abs() < threshold).all(axis=1)]  # Keep only rows within threshold
+
+            if st.button("Apply Outlier Handling"):
+                st.success(f"Outlier handling using {method} has been applied.")
+                st.session_state['df_preprocessed'] = outlier_df
+                st.session_state['outliers_handled'] = True
+                st.session_state['show_before_after_button'] = True
+                st.session_state['show_save_button'] = True
+                st.session_state['show_outlier_handling_dialog'] = False
+
+        if 'show_outlier_handling_dialog' not in st.session_state:
+            st.session_state['show_outlier_handling_dialog'] = True
+
+        if st.session_state['show_outlier_handling_dialog']:
+            show_outlier_handling_dialog()
+
+        return df if 'df_preprocessed' not in st.session_state else st.session_state['df_preprocessed']
+   
+
+# Main page for preprocessing
 def load_css():
     with open('static/style.css') as f:
         css_code = f.read()
@@ -219,8 +355,11 @@ def load_css():
 
 def reset_preprocessing_state():
     session_keys_to_reset = ['df_preprocessed', 'duplicates_removed', 'missing_values_filled',
-                             'scaling_applied', 'encoding_applied', 'show_before_after_button', 'show_save_button',
-                             'show_duplicates_dialog', 'show_fill_missing_dialog', 'show_scale_features_dialog', 'show_encode_dialog']
+                             'scaling_applied', 'encoding_applied', 'imbalanced_data_handled', 
+                             'outliers_handled', 'show_before_after_button', 'show_save_button',
+                             'show_duplicates_dialog', 'show_fill_missing_dialog', 
+                             'show_scale_features_dialog', 'show_encode_dialog', 'show_handle_imbalanced_dialog',
+                             'show_outlier_handling_dialog']
     
     for key in session_keys_to_reset:
         if key in st.session_state:
@@ -252,9 +391,9 @@ def data_preprocessing_page():
             st.write(f"Dataset: {dataset_name}")
 
         with st.container(border=True):
-            preprocess_options = ["Remove Duplicates", "Fill Missing Values", "Scale Features", "Encode Data"]
+            preprocess_options = ["Remove Duplicates", "Fill Missing Values", "Scale Features", "Encode Data", "Handle Imbalanced Data", "Handle Outliers"]
             selected_preprocess = st.selectbox("Choose a preprocessing step", preprocess_options,
-                                               help="Choose a preprocessing technique: 'Remove Duplicates', 'Fill Missing Values', 'Scale Features', or 'Encode Data'.")
+                                               help="Choose a preprocessing technique: 'Remove Duplicates', 'Fill Missing Values', 'Scale Features', 'Encode Data', 'Handle Imbalanced Data', or 'Handle Outliers'.")
             st.session_state['selected_preprocess'] = selected_preprocess
 
         if selected_preprocess == "Remove Duplicates":
@@ -295,6 +434,28 @@ def data_preprocessing_page():
                 st.warning("You've already applied encoding.")
             else:
                 preprocessing_context = PreprocessDataset(EncodeData())
+                if st.button("Apply"):
+                    df_preprocessed = preprocessing_context.apply_preprocessing(st.session_state.df_preprocessed)
+                    st.session_state.df_preprocessed = df_preprocessed
+                    st.session_state['show_before_after_button'] = True
+                    st.session_state['show_save_button'] = True
+
+        elif selected_preprocess == "Handle Imbalanced Data":
+            if st.session_state.get('imbalanced_data_handled', False):
+                st.warning("You've already handled the imbalanced data.")
+            else:
+                preprocessing_context = PreprocessDataset(HandleImbalancedData())
+                if st.button("Apply"):
+                    df_preprocessed = preprocessing_context.apply_preprocessing(st.session_state.df_preprocessed)
+                    st.session_state.df_preprocessed = df_preprocessed
+                    st.session_state['show_before_after_button'] = True
+                    st.session_state['show_save_button'] = True
+
+        elif selected_preprocess == "Handle Outliers":
+            if st.session_state.get('outliers_handled', False):
+                st.warning("You've already handled outliers.")
+            else:
+                preprocessing_context = PreprocessDataset(OutlierHandling())
                 if st.button("Apply"):
                     df_preprocessed = preprocessing_context.apply_preprocessing(st.session_state.df_preprocessed)
                     st.session_state.df_preprocessed = df_preprocessed

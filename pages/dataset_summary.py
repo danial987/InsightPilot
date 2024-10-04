@@ -4,16 +4,13 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
-
 def load_css():
     with open('static/style.css') as f:
         css_code = f.read()
     st.markdown(f'<style>{css_code}</style>', unsafe_allow_html=True)
 
-
 def calculate_memory_usage(df):
     return df.memory_usage(deep=True).sum()
-
 
 def is_hashable(val):
     try:
@@ -22,10 +19,8 @@ def is_hashable(val):
         return False
     return True
 
-
 def make_hashable(df):
     return df.applymap(lambda x: tuple(x) if isinstance(x, list) else x)
-
 
 def generate_dataset_description(df):
     num_variables = df.shape[1]
@@ -34,7 +29,6 @@ def generate_dataset_description(df):
     categorical_features = df.select_dtypes(include=['object']).columns.tolist()
     missing_cells = df.isnull().sum().sum()
     
-    # Convert non-hashable types to hashable types
     hashable_df = make_hashable(df)
     duplicate_rows = hashable_df.duplicated().sum()
 
@@ -46,25 +40,20 @@ def generate_dataset_description(df):
     With its mix of numerical and categorical data, it allows for comprehensive statistical analyses and predictive modeling.
     Additionally, handling missing data and duplicate rows can help improve data quality and model performance.
     """
-
     return description
-
 
 class DatasetSummary:
     @staticmethod
     def display_summary(df, dataset_name):
-        # Generate and display dataset description
         description = generate_dataset_description(df)
 
         with st.expander("Dataset"):
             st.write(f"### Dataset: {dataset_name}")
             st.write(description)
 
-        # Identify features
         categorical_features = df.select_dtypes(include=['object']).columns.tolist()
         numerical_features = df.select_dtypes(include=[np.number]).columns.tolist()
 
-        # Calculate warnings
         warnings = []
         for col in df.columns:
             if df[col].isnull().sum() > 0:
@@ -74,7 +63,6 @@ class DatasetSummary:
             if df[col].dtype in [np.number] and df[col].skew() > 1:
                 warnings.append((col, f"highly skewed (γ1 = {df[col].skew():.2f})", "skewed"))
 
-        # Overview Section
         with st.container(border=True):
             st.header("Overview")
 
@@ -142,7 +130,6 @@ class DatasetSummary:
                 else:
                     st.write("No warnings")
 
-        # Numerical Features Analysis
         with st.container(border=True):
             st.subheader("Numerical Features Analysis")
 
@@ -180,7 +167,6 @@ class DatasetSummary:
                     st.write("##### Unique Values")
                     unique_tab1, unique_tab2 = st.tabs(["Table", "Visualization"])
                     with unique_tab1:
-                        # Convert non-hashable types to strings
                         unique_values = df[numerical_features].applymap(lambda x: str(x) if not is_hashable(x) else x).nunique().reset_index()
                         unique_values.columns = ['Feature', 'Unique Values']
                         st.write(unique_values)
@@ -251,7 +237,6 @@ class DatasetSummary:
             else:
                 st.write("No numerical features found in the dataset.")
 
-        # Categorical Features Analysis
         with st.container(border=True):
             st.subheader("Categorical Features Analysis")
 
@@ -286,7 +271,6 @@ class DatasetSummary:
                     st.write("##### Unique Values")
                     unique_tab1, unique_tab2 = st.tabs(["Table", "Visualization"])
                     with unique_tab1:
-                        # Convert non-hashable types to strings
                         unique_values = df[categorical_features].applymap(lambda x: str(x) if not is_hashable(x) else x).nunique().reset_index()
                         unique_values.columns = ['Feature', 'Unique Values']
                         st.write(unique_values)
@@ -320,14 +304,13 @@ class DatasetSummary:
                         with tab:
                             st.write(f"### Top {top_n} Categories for {feature}")
                             value_counts = df[feature].value_counts().head(top_n)
-                            value_counts = value_counts.reset_index()  # Reset index to get a DataFrame
-                            value_counts.columns = ['Category', 'Count']  # Rename the columns for clarity
+                            value_counts = value_counts.reset_index()  
+                            value_counts.columns = ['Category', 'Count']
                             fig = px.bar(value_counts, x='Category', y='Count', title=f"Top {top_n} Categories for {feature}", color_discrete_sequence=["#9933FF"])
                             st.plotly_chart(fig, use_container_width=True)
             else:
                 st.write("No categorical features found in the dataset.")
 
-        # Data Overview
         with st.container(border=True):
             st.subheader("Data Overview")
 
@@ -345,8 +328,6 @@ class DatasetSummary:
                 st.write("##### Full DataFrame")
                 st.dataframe(df)
 
-
-# In dataset_summary_page, update dataset_id_to_preprocess correctly
 def dataset_summary_page():
     load_css()
     st.header('Dataset Summary', divider='violet')
@@ -364,10 +345,9 @@ def dataset_summary_page():
                 st.switch_page("pages/dataset_upload.py")
         with col2:
             if st.button("Go to Preprocessing", key="go_to_preprocessing"):
-                st.session_state.df_to_preprocess = st.session_state.df  # Store the dataframe in session state
-                st.session_state.dataset_name_to_preprocess = st.session_state.dataset_name  # Store the name
-                st.session_state.dataset_id_to_preprocess = st.session_state.dataset_id  # Ensure dataset ID is passed here
+                st.session_state.df_to_preprocess = st.session_state.df  
+                st.session_state.dataset_name_to_preprocess = st.session_state.dataset_name 
+                st.session_state.dataset_id_to_preprocess = st.session_state.dataset_id
                 st.switch_page("pages/data_preprocessing.py")
-
-
+                
 dataset_summary_page()

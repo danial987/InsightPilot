@@ -43,7 +43,7 @@ def categorize_by_time(datasets):
 
 def format_file_size(file_size_bytes):
     """Helper function to display file size in KB or MB"""
-    if file_size_bytes < 1024 * 1024:  # Less than 1 MB
+    if file_size_bytes < 1024 * 1024:
         return f"{round(file_size_bytes / 1024, 2)} KB"
     else:
         return f"{round(file_size_bytes / (1024 * 1024), 2)} MB"
@@ -105,9 +105,9 @@ def dataset_upload_page():
                         dataset_db.save_to_database(file_name, file_format, file_size, data)
                         st.success("Dataset uploaded successfully!")
                         st.session_state.uploaded = True
-                        st.session_state.show_summary_button = True  # Set flag to show summary button
-                        progress_text.text("")  # Clear the progress text
-                        progress_bar.empty()  # Clear the progress bar
+                        st.session_state.show_summary_button = True 
+                        progress_text.text("")  
+                        progress_bar.empty() 
 
                 except pd.errors.ParserError as e:
                     st.error(f"Error parsing the file: {e}")
@@ -121,7 +121,7 @@ def dataset_upload_page():
 
         if st.session_state.show_summary_button:
             if st.button("View Data Summary"):
-                st.session_state.show_summary_button = False  # Hide the button after navigating
+                st.session_state.show_summary_button = False 
                 st.switch_page("pages/dataset_summary.py")
 
     datasets_list = dataset_db.fetch_datasets()
@@ -184,7 +184,7 @@ def dataset_upload_page():
                         with col3:
                             st.write(f"{ds.file_format.upper()}")
                         with col4:
-                            st.write(f"{format_file_size(ds.file_size)}")  # Updated line to show size in KB/MB
+                            st.write(f"{format_file_size(ds.file_size)}")  
                         with col5:
                             st.write(f"{ds.last_accessed.strftime('%Y-%m-%d %H:%M:%S')}")
                         with col6:
@@ -196,24 +196,23 @@ def dataset_upload_page():
                                 index=st.session_state.rename_action_state.get(ds.id, 0)
                             )
 
-                            # Handling actions
                             if action == "View Summary":
                                 view_dataset_summary(ds.id)
                             elif action == "Preprocessing":
-                                dataset = dataset_db.get_dataset_by_id(ds.id)  # Fetch dataset by id
-                                st.session_state.df_to_preprocess = dataset.data  # Ensure dataset is stored
-                                st.session_state.dataset_name_to_preprocess = dataset.name  # Store dataset name
-                                st.session_state.dataset_id_to_preprocess = ds.id  # Store dataset ID
+                                dataset = dataset_db.get_dataset_by_id(ds.id) 
+                                st.session_state.df_to_preprocess = dataset.data 
+                                st.session_state.dataset_name_to_preprocess = dataset.name  
+                                st.session_state.dataset_id_to_preprocess = ds.id 
                                 st.switch_page("pages/data_preprocessing.py")
                             elif action == "Delete":
                                 delete_dataset(ds.id)
                             elif action == "Rename":
-                                st.session_state.rename_action_state[ds.id] = 6  # Keep the state at "Rename"
+                                st.session_state.rename_action_state[ds.id] = 6 
                                 st.session_state['show_rename_dialog'] = True
                                 st.session_state['current_rename_id'] = ds.id
-                                st.session_state['current_rename_name'] = ds.name.split('.')[0]  # Show the name without extension
+                                st.session_state['current_rename_name'] = ds.name.split('.')[0]  
                             else:
-                                st.session_state.rename_action_state[ds.id] = 0  # Reset to "Select" after rename
+                                st.session_state.rename_action_state[ds.id] = 0  
                         st.write('</div>', unsafe_allow_html=True)
             st.write('</div>', unsafe_allow_html=True)
 
@@ -224,7 +223,7 @@ def dataset_upload_page():
             st.write("You don't have any datasets uploaded. Please upload a dataset to get started.")
 
 def view_dataset_summary(dataset_id):
-    dataset = dataset_db.get_dataset_by_id(dataset_id)  # Fetch the dataset by ID
+    dataset = dataset_db.get_dataset_by_id(dataset_id) 
     if dataset:
         data = dataset.data
         file_format = dataset.file_format
@@ -242,7 +241,7 @@ def view_dataset_summary(dataset_id):
                 return
         st.session_state.df = df
         st.session_state.dataset_name = dataset.name
-        st.session_state.dataset_id = dataset_id  # Make sure dataset_id is set in session state
+        st.session_state.dataset_id = dataset_id  
         dataset_db.update_last_accessed(dataset_id)
         st.switch_page("pages/dataset_summary.py")
 
@@ -258,7 +257,7 @@ def show_rename_dialog():
     col1, col2 = st.columns(2)
     if col1.button("Cancel"):
         st.session_state['show_rename_dialog'] = False
-        st.session_state.rename_action_state[dataset_id] = 0  # Reset to "Select"
+        st.session_state.rename_action_state[dataset_id] = 0 
         st.experimental_rerun()
     if col2.button("Rename"):
         if dataset_db.dataset_exists(new_name):
@@ -266,8 +265,8 @@ def show_rename_dialog():
         else:
             dataset_db.rename_dataset(dataset_id, new_name)
             st.session_state['show_rename_dialog'] = False
-            st.session_state.rename_action_state[dataset_id] = 0  # Reset to "Select"
-            st.experimental_rerun()  # Ensure the recent files list is updated without full page reload
+            st.session_state.rename_action_state[dataset_id] = 0  
+            st.experimental_rerun() 
 
 if 'show_rename_dialog' not in st.session_state:
     st.session_state['show_rename_dialog'] = False
