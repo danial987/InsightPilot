@@ -35,6 +35,27 @@ class PieChart(IVisualizationStrategy):
         else:
             st.warning("Please select at least one feature to generate a pie chart.")
 
+# Concrete strategy: Bar Chart
+class BarChart(IVisualizationStrategy):
+    def plot(self, df: pd.DataFrame, x_column: str, y_columns: list, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
+        if x_column and y_columns:
+            color_list = getattr(px.colors.qualitative, color_scheme, px.colors.qualitative.Plotly)
+
+            fig = px.bar(df, x=x_column, y=y_columns, title=chart_title, color_discrete_sequence=color_list)
+
+            fig.update_layout(
+                title=dict(text=chart_title, font=dict(family=font_family, size=font_size)),
+                legend=dict(font=dict(family=font_family, size=font_size)),
+                showlegend=show_legend
+            )
+
+            if show_labels:
+                fig.update_traces(texttemplate='%{y:.2s}', textposition='auto')
+
+            st.plotly_chart(fig)
+        else:
+            st.warning("Please select both X and Y columns to generate a bar chart.")
+
 # Concrete strategy: Line Chart (2D and 3D)
 class LineChart(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str, y_columns: list, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
@@ -253,10 +274,6 @@ def load_css():
         css_code = f.read()
     st.markdown(f'<style>{css_code}</style>', unsafe_allow_html=True)
 
-# Main page for data visualization
-# Main page for data visualization
-# Main page for data visualization
-# Main page for data visualization
 def data_visualization_page():
     load_css()
     st.header('Data Visualization', divider='violet')
@@ -277,7 +294,7 @@ def data_visualization_page():
             col1, col2 = st.columns([1, 2.5])
 
         with col1:
-            chart_type = st.selectbox("Select Chart Type", ["Pie Chart", "Line Chart", "Scatter Plot", "Box Plot", "Histogram", "Correlation Matrix"], help="Choose a chart type.")
+            chart_type = st.selectbox("Select Chart Type", ["Pie Chart", "Bar Chart", "Line Chart", "Scatter Plot", "Box Plot", "Histogram", "Correlation Matrix"], help="Choose a chart type.")
 
             if chart_type == "Pie Chart":
                 context = VisualizationContext(PieChart())
@@ -304,6 +321,40 @@ def data_visualization_page():
                 font_size = st.slider("Font Size", 10, 30, value=14)
 
                 st.session_state.selected_columns = selected_columns
+                st.session_state.show_legend = show_legend
+                st.session_state.show_labels = show_labels
+                st.session_state.chart_title = chart_title
+                st.session_state.color_scheme = color_scheme
+                st.session_state.font_family = font_family
+                st.session_state.font_size = font_size
+
+            elif chart_type == "Bar Chart":
+                context = VisualizationContext(BarChart())
+
+                numerical_columns = df.select_dtypes(include=['number']).columns.tolist()
+
+                if len(numerical_columns) == 0:
+                    st.warning(f"No numerical columns found in the dataset for {chart_type}.")
+                    return
+
+                x_column = st.selectbox("Select X-axis", numerical_columns)
+                y_columns = st.multiselect("Select Y-axis", numerical_columns)
+
+                col3, col4 = st.columns(2)
+                with col3:
+                    show_legend = st.checkbox("Show Legend", value=True)
+                with col4:
+                    show_labels = st.checkbox("Show Labels", value=True)
+
+                chart_title = st.text_input("Chart Title", value=f"{chart_type}")
+
+                color_schemes = ['Plotly', 'D3', 'G10', 'T10', 'Alphabet', 'Dark24', 'Set3']
+                color_scheme = st.selectbox("Select Color Scheme", color_schemes)
+                font_family = st.selectbox("Font Family", ["Arial", "Courier New", "Times New Roman", "Verdana"])
+                font_size = st.slider("Font Size", 10, 30, value=14)
+
+                st.session_state.x_column = x_column
+                st.session_state.y_columns = y_columns
                 st.session_state.show_legend = show_legend
                 st.session_state.show_labels = show_labels
                 st.session_state.chart_title = chart_title
@@ -392,7 +443,7 @@ def data_visualization_page():
                         st.session_state.font_family,
                         st.session_state.font_size
                     )
-                elif chart_type in ["Line Chart", "Scatter Plot", "Box Plot", "Histogram"] and st.session_state.x_column and st.session_state.y_columns:
+                elif chart_type in ["Bar Chart", "Line Chart", "Scatter Plot", "Box Plot", "Histogram"] and st.session_state.x_column and st.session_state.y_columns:
                     st.write("### Chart Preview")
                     context.create_visualization(
                         df,
