@@ -9,6 +9,7 @@ class IVisualizationStrategy:
     def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
         raise NotImplementedError("Visualization strategies must implement the plot method.")
 
+
 # Concrete strategy: Pie Chart
 class PieChart(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
@@ -256,22 +257,19 @@ class CorrelationMatrix(IVisualizationStrategy):
         # Render the correlation matrix using Streamlit
         st.plotly_chart(fig)
 
-# New Concrete Strategy: HeatMap (2D and 3D)
-# New Concrete Strategy: HeatMap (2D and 3D)
+
+# Concrete strategy: HeatMap (2D and 3D)
 class HeatMap(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Viridis", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
-        # Ensure the required columns are selected
         if y_columns is None or len(y_columns) < 2:
             st.warning("Please select at least two numeric columns to generate a heatmap.")
             return
 
         # Filter numeric columns
         numeric_df = df[y_columns].select_dtypes(include=['number'])
-
-        # Create correlation matrix from numeric data
         correlation_matrix = numeric_df.corr()
 
-        # Map the color scheme to a valid Plotly colorscale
+        # Map color scheme to valid colorscale
         colorscale_map = {
             'Plotly': 'plotly3',
             'D3': 'd3',
@@ -284,13 +282,10 @@ class HeatMap(IVisualizationStrategy):
             'Turbo': 'turbo'
         }
 
-        # Default to Viridis if the provided color scheme is not in the map
         valid_colorscale = colorscale_map.get(color_scheme, 'viridis')
 
         if is_3d:
-            # Create 3D surface heatmap
             fig = go.Figure(data=[go.Surface(z=correlation_matrix.values, colorscale=valid_colorscale)])
-
             fig.update_layout(
                 title=dict(text=chart_title, font=dict(family=font_family, size=font_size)),
                 scene=dict(
@@ -302,7 +297,6 @@ class HeatMap(IVisualizationStrategy):
                 )
             )
         else:
-            # Create 2D heatmap
             fig = go.Figure(data=go.Heatmap(
                 z=correlation_matrix.values,
                 x=correlation_matrix.columns,
@@ -321,8 +315,6 @@ class HeatMap(IVisualizationStrategy):
 
         st.plotly_chart(fig)
 
-
-
 # Context class for Visualization
 class VisualizationContext:
     def __init__(self, strategy: IVisualizationStrategy):
@@ -334,7 +326,6 @@ class VisualizationContext:
     def create_visualization(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False):
         self._strategy.plot(df, x_column, y_columns, z_column, show_legend, show_labels, chart_title, color_scheme, font_family, font_size, is_3d)
 
-
 # Main page for data visualization
 def load_css():
     with open('static/style.css') as f:
@@ -344,6 +335,30 @@ def load_css():
 def data_visualization_page():
     load_css()
     st.header('Data Visualization', divider='violet')
+
+    # Initialize session state variables if they don't exist
+    if 'x_column' not in st.session_state:
+        st.session_state.x_column = None
+    if 'y_columns' not in st.session_state:
+        st.session_state.y_columns = []
+    if 'z_column' not in st.session_state:
+        st.session_state.z_column = None
+    if 'is_3d' not in st.session_state:
+        st.session_state.is_3d = False
+    if 'selected_columns' not in st.session_state:
+        st.session_state.selected_columns = []
+    if 'show_legend' not in st.session_state:
+        st.session_state.show_legend = True
+    if 'show_labels' not in st.session_state:
+        st.session_state.show_labels = True
+    if 'chart_title' not in st.session_state:
+        st.session_state.chart_title = ""
+    if 'color_scheme' not in st.session_state:
+        st.session_state.color_scheme = "Plotly"
+    if 'font_family' not in st.session_state:
+        st.session_state.font_family = "Arial"
+    if 'font_size' not in st.session_state:
+        st.session_state.font_size = 14
 
     if 'df_to_visualize' in st.session_state:
         data = st.session_state.df_to_visualize
@@ -407,12 +422,6 @@ def data_visualization_page():
                 x_column = st.selectbox("Select X-axis", numerical_columns)
                 y_columns = st.multiselect("Select Y-axis", numerical_columns)
 
-                col3, col4 = st.columns(2)
-                with col3:
-                    show_legend = st.checkbox("Show Legend", value=True)
-                with col4:
-                    show_labels = st.checkbox("Show Labels", value=True)
-
                 chart_title = st.text_input("Chart Title", value=f"{chart_type}")
 
                 color_schemes = ['Plotly', 'D3', 'G10', 'T10', 'Alphabet', 'Dark24', 'Set3']
@@ -422,8 +431,6 @@ def data_visualization_page():
 
                 st.session_state.x_column = x_column
                 st.session_state.y_columns = y_columns
-                st.session_state.show_legend = show_legend
-                st.session_state.show_labels = show_labels
                 st.session_state.chart_title = chart_title
                 st.session_state.color_scheme = color_scheme
                 st.session_state.font_family = font_family
@@ -441,14 +448,11 @@ def data_visualization_page():
                 x_column = st.selectbox("Select X-axis", numerical_columns)
                 y_columns = st.multiselect("Select Y-axis", numerical_columns) if chart_type != "Histogram" else [st.selectbox("Select Y-axis", numerical_columns)]
 
+                # Remove unnecessary toggles for specific charts
+                show_legend = False if chart_type == "Scatter Plot" else True
+                show_labels = False if chart_type == "Bar Chart" or chart_type == "Box Plot" else True
                 is_3d = st.checkbox("Enable 3D Chart") if chart_type in ["Line Chart", "Scatter Plot"] else False
                 z_column = st.selectbox("Select Z-axis for 3D Chart", numerical_columns) if is_3d else None
-
-                col3, col4 = st.columns(2)
-                with col3:
-                    show_legend = st.checkbox("Show Legend", value=True)
-                with col4:
-                    show_labels = st.checkbox("Show Markers" if chart_type != "Box Plot" else "Show Labels", value=True)
 
                 chart_title = st.text_input("Chart Title", value=f"{chart_type}")
 
@@ -461,8 +465,6 @@ def data_visualization_page():
                 st.session_state.y_columns = y_columns
                 st.session_state.z_column = z_column
                 st.session_state.is_3d = is_3d
-                st.session_state.show_legend = show_legend
-                st.session_state.show_labels = show_labels
                 st.session_state.chart_title = chart_title
                 st.session_state.color_scheme = color_scheme
                 st.session_state.font_family = font_family
@@ -505,7 +507,6 @@ def data_visualization_page():
 
                 selected_columns = st.multiselect("Select features for HeatMap", numerical_columns)
 
-                # Show 3D chart toggle directly after selecting features
                 if selected_columns:
                     is_3d = st.checkbox("Enable 3D HeatMap", value=False)
 
