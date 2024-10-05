@@ -3,12 +3,13 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import io
+import matplotlib.pyplot as plt  # <-- Importing matplotlib for the Mosaic Plot
+from statsmodels.graphics.mosaicplot import mosaic
 
 # Interface for Visualization Strategy
 class IVisualizationStrategy:
     def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
         raise NotImplementedError("Visualization strategies must implement the plot method.")
-
 
 # Concrete strategy: Pie Chart
 class PieChart(IVisualizationStrategy):
@@ -315,6 +316,55 @@ class HeatMap(IVisualizationStrategy):
 
         st.plotly_chart(fig)
 
+class MosaicPlot(IVisualizationStrategy):
+    def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
+        if x_column and y_columns:
+            # Limit to top N categories for faster processing
+            top_n = 5
+            df_filtered = df[df[x_column].isin(df[x_column].value_counts().index[:top_n])]
+            df_filtered = df_filtered[df_filtered[y_columns[0]].isin(df_filtered[y_columns[0]].value_counts().index[:top_n])]
+
+            try:
+                # Group the data and calculate the proportions of each category
+                df_grouped = df_filtered.groupby([x_column, y_columns[0]]).size().reset_index(name='Count')
+
+            except ValueError as e:
+                # Handle the duplicate column error
+                st.error(f"Error: {str(e)}. Please ensure the columns used for grouping don't conflict with existing column names.")
+                return
+
+            # Calculate the proportion for each group
+            df_grouped['Proportion'] = df_grouped.groupby(x_column)['Count'].transform(lambda x: x / x.sum())
+
+            # Create a stacked bar chart using Plotly
+            fig = px.bar(
+                df_grouped,
+                x=x_column,
+                y='Proportion',
+                color=y_columns[0],
+                text='Count',  # Show the actual counts
+                title=chart_title,
+                labels={'Proportion': 'Proportion'},
+                color_discrete_sequence=getattr(px.colors.qualitative, color_scheme, px.colors.qualitative.Plotly)
+            )
+
+            # Update layout for font, legend, and add text labels for proportions
+            fig.update_layout(
+                title=dict(text=chart_title, font=dict(family=font_family, size=font_size)),
+                legend=dict(font=dict(family=font_family, size=font_size)),
+                showlegend=show_legend
+            )
+
+            # Show the values on the bars (Count values)
+            if show_labels:
+                fig.update_traces(texttemplate='%{text:.2s}', textposition='auto')
+
+            st.plotly_chart(fig)
+
+        else:
+            st.warning("Please select valid X and Y columns for the Mosaic plot.")
+
+
 # Context class for Visualization
 class VisualizationContext:
     def __init__(self, strategy: IVisualizationStrategy):
@@ -376,7 +426,7 @@ def data_visualization_page():
             col1, col2 = st.columns([1, 2.5])
 
         with col1:
-            chart_type = st.selectbox("Select Chart Type", ["Pie Chart", "Bar Chart", "Line Chart", "Scatter Plot", "Box Plot", "Histogram", "Correlation Matrix", "HeatMap"], help="Choose a chart type.")
+            chart_type = st.selectbox("Select Chart Type", ["Pie Chart", "Bar Chart", "Line Chart", "Scatter Plot", "Box Plot", "Histogram", "Correlation Matrix", "HeatMap", "Mosaic Plot"], help="Choose a chart type.")
 
             if chart_type == "Pie Chart":
                 context = VisualizationContext(PieChart())
@@ -521,6 +571,30 @@ def data_visualization_page():
                 st.session_state.font_size = font_size
                 st.session_state.is_3d = is_3d if selected_columns else False
 
+            elif chart_type == "Mosaic Plot":
+                context = VisualizationContext(MosaicPlot())
+
+                categorical_columns = df.select_dtypes(include=['object', 'category']).columns.tolist()
+
+                if len(categorical_columns) == 0:
+                    st.warning("No categorical columns found in the dataset for Mosaic plot.")
+                    return
+
+                x_column = st.selectbox("Select X-axis", categorical_columns)
+
+                # Filter Y-axis options to remove the selected X-axis option
+                y_columns = st.multiselect("Select Y-axis", [col for col in categorical_columns if col != x_column])
+
+                if not x_column or not y_columns:
+                    st.warning("Please select X and Y columns for Mosaic plot.")
+                    return
+
+                chart_title = st.text_input("Chart Title", value="Mosaic Plot")
+
+                st.session_state.x_column = x_column
+                st.session_state.y_columns = y_columns
+                st.session_state.chart_title = chart_title
+
         with col2:
             with st.spinner("Generating Chart..."):
                 if chart_type == "Pie Chart" and st.session_state.selected_columns:
@@ -579,6 +653,17 @@ def data_visualization_page():
                         font_family=st.session_state.font_family,
                         font_size=st.session_state.font_size,
                         is_3d=st.session_state.is_3d
+                    )
+                elif chart_type == "Mosaic Plot" and st.session_state.x_column and st.session_state.y_columns:
+                    st.write("### Chart Preview")
+                    context.create_visualization(
+                        df,
+                        st.session_state.x_column,
+                        st.session_state.y_columns, 
+                        None,
+                        show_legend=False,
+                        show_labels=True,
+                        chart_title=st.session_state.chart_title
                     )
                 else:
                     st.warning(f"Please select appropriate features for {chart_type} to generate a chart.")
