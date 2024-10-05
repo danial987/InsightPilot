@@ -256,6 +256,72 @@ class CorrelationMatrix(IVisualizationStrategy):
         # Render the correlation matrix using Streamlit
         st.plotly_chart(fig)
 
+# New Concrete Strategy: HeatMap (2D and 3D)
+# New Concrete Strategy: HeatMap (2D and 3D)
+class HeatMap(IVisualizationStrategy):
+    def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Viridis", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
+        # Ensure the required columns are selected
+        if y_columns is None or len(y_columns) < 2:
+            st.warning("Please select at least two numeric columns to generate a heatmap.")
+            return
+
+        # Filter numeric columns
+        numeric_df = df[y_columns].select_dtypes(include=['number'])
+
+        # Create correlation matrix from numeric data
+        correlation_matrix = numeric_df.corr()
+
+        # Map the color scheme to a valid Plotly colorscale
+        colorscale_map = {
+            'Plotly': 'plotly3',
+            'D3': 'd3',
+            'G10': 'rainbow',
+            'T10': 'turbo',
+            'Alphabet': 'speed',
+            'Dark24': 'darkmint',
+            'Set3': 'matter',
+            'Viridis': 'viridis',
+            'Turbo': 'turbo'
+        }
+
+        # Default to Viridis if the provided color scheme is not in the map
+        valid_colorscale = colorscale_map.get(color_scheme, 'viridis')
+
+        if is_3d:
+            # Create 3D surface heatmap
+            fig = go.Figure(data=[go.Surface(z=correlation_matrix.values, colorscale=valid_colorscale)])
+
+            fig.update_layout(
+                title=dict(text=chart_title, font=dict(family=font_family, size=font_size)),
+                scene=dict(
+                    xaxis=dict(tickvals=list(range(len(correlation_matrix.columns))),
+                               ticktext=correlation_matrix.columns, title="Features"),
+                    yaxis=dict(tickvals=list(range(len(correlation_matrix.index))),
+                               ticktext=correlation_matrix.index, title="Features"),
+                    zaxis=dict(title="Correlation"),
+                )
+            )
+        else:
+            # Create 2D heatmap
+            fig = go.Figure(data=go.Heatmap(
+                z=correlation_matrix.values,
+                x=correlation_matrix.columns,
+                y=correlation_matrix.columns,
+                colorscale=valid_colorscale
+            ))
+
+            if show_labels:
+                fig.update_traces(texttemplate="%{z:.2f}")
+
+            fig.update_layout(
+                title=dict(text=chart_title, font=dict(family=font_family, size=font_size)),
+                xaxis=dict(tickfont=dict(family=font_family, size=font_size)),
+                yaxis=dict(tickfont=dict(family=font_family, size=font_size))
+            )
+
+        st.plotly_chart(fig)
+
+
 
 # Context class for Visualization
 class VisualizationContext:
@@ -267,6 +333,7 @@ class VisualizationContext:
 
     def create_visualization(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False):
         self._strategy.plot(df, x_column, y_columns, z_column, show_legend, show_labels, chart_title, color_scheme, font_family, font_size, is_3d)
+
 
 # Main page for data visualization
 def load_css():
@@ -294,7 +361,7 @@ def data_visualization_page():
             col1, col2 = st.columns([1, 2.5])
 
         with col1:
-            chart_type = st.selectbox("Select Chart Type", ["Pie Chart", "Bar Chart", "Line Chart", "Scatter Plot", "Box Plot", "Histogram", "Correlation Matrix"], help="Choose a chart type.")
+            chart_type = st.selectbox("Select Chart Type", ["Pie Chart", "Bar Chart", "Line Chart", "Scatter Plot", "Box Plot", "Histogram", "Correlation Matrix", "HeatMap"], help="Choose a chart type.")
 
             if chart_type == "Pie Chart":
                 context = VisualizationContext(PieChart())
@@ -427,6 +494,32 @@ def data_visualization_page():
                 st.session_state.font_size = font_size
                 st.session_state.is_3d = is_3d if selected_columns else False
 
+            elif chart_type == "HeatMap":
+                context = VisualizationContext(HeatMap())
+
+                numerical_columns = df.select_dtypes(include=['number']).columns.tolist()
+
+                if len(numerical_columns) == 0:
+                    st.warning("No numerical columns found in the dataset for heatmap.")
+                    return
+
+                selected_columns = st.multiselect("Select features for HeatMap", numerical_columns)
+
+                # Show 3D chart toggle directly after selecting features
+                if selected_columns:
+                    is_3d = st.checkbox("Enable 3D HeatMap", value=False)
+
+                chart_title = st.text_input("Chart Title", value="HeatMap")
+
+                font_family = st.selectbox("Font Family", ["Arial", "Courier New", "Times New Roman", "Verdana"])
+                font_size = st.slider("Font Size", 10, 30, value=14)
+
+                st.session_state.selected_columns = selected_columns
+                st.session_state.chart_title = chart_title
+                st.session_state.font_family = font_family
+                st.session_state.font_size = font_size
+                st.session_state.is_3d = is_3d if selected_columns else False
+
         with col2:
             with st.spinner("Generating Chart..."):
                 if chart_type == "Pie Chart" and st.session_state.selected_columns:
@@ -459,6 +552,20 @@ def data_visualization_page():
                         st.session_state.is_3d
                     )
                 elif chart_type == "Correlation Matrix" and st.session_state.selected_columns:
+                    st.write("### Chart Preview")
+                    context.create_visualization(
+                        df,
+                        None,
+                        st.session_state.selected_columns, 
+                        None,
+                        show_legend=True,
+                        show_labels=True,
+                        chart_title=st.session_state.chart_title,
+                        font_family=st.session_state.font_family,
+                        font_size=st.session_state.font_size,
+                        is_3d=st.session_state.is_3d
+                    )
+                elif chart_type == "HeatMap" and st.session_state.selected_columns:
                     st.write("### Chart Preview")
                     context.create_visualization(
                         df,
