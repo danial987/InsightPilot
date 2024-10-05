@@ -204,6 +204,13 @@ def dataset_upload_page():
                                 st.session_state.dataset_name_to_preprocess = dataset.name  
                                 st.session_state.dataset_id_to_preprocess = ds.id 
                                 st.switch_page("pages/data_preprocessing.py")
+
+                            elif action == "Visualization":
+                                dataset = dataset_db.get_dataset_by_id(ds.id)  
+                                st.session_state.df_to_visualize = dataset.data 
+                                st.session_state.dataset_name_to_visualize = dataset.name 
+                                st.switch_page("pages/data_visualization.py") 
+
                             elif action == "Delete":
                                 delete_dataset(ds.id)
                             elif action == "Rename":

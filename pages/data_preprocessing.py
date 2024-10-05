@@ -351,6 +351,7 @@ def data_preprocessing_page():
     
     st.header('Data Preprocessing', divider='violet')
 
+    # Ensure session state is reset when a new dataset is selected
     if 'dataset_name_to_preprocess' in st.session_state:
         if 'previous_dataset' not in st.session_state or st.session_state['previous_dataset'] != st.session_state['dataset_name_to_preprocess']:
             reset_preprocessing_state()
@@ -359,24 +360,40 @@ def data_preprocessing_page():
     if 'df_to_preprocess' in st.session_state and 'dataset_name_to_preprocess' in st.session_state:
         data = st.session_state.df_to_preprocess
         
+        # Decode bytes to DataFrame if necessary
         if isinstance(data, bytes):
             df = pd.read_csv(io.StringIO(data.decode('utf-8')))
         else:
             df = data
 
+        # Store the original data copy for preprocessing
         if 'df_preprocessed' not in st.session_state:
             st.session_state['df_preprocessed'] = df.copy()
 
         dataset_name = st.session_state.dataset_name_to_preprocess
+        
+        # Display dataset name
         with st.container(border=True):
             st.write(f"Dataset: {dataset_name}")
 
+        # Preprocessing steps options
         with st.container(border=True):
-            preprocess_options = ["Remove Duplicates", "Fill Missing Values", "Scale Features", "Encode Data", "Handle Imbalanced Data", "Handle Outliers"]
-            selected_preprocess = st.selectbox("Choose a preprocessing step", preprocess_options,
-                                               help="Choose a preprocessing technique: 'Remove Duplicates', 'Fill Missing Values', 'Scale Features', 'Encode Data', 'Handle Imbalanced Data', or 'Handle Outliers'.")
+            preprocess_options = [
+                "Remove Duplicates", 
+                "Fill Missing Values", 
+                "Scale Features", 
+                "Encode Data", 
+                "Handle Imbalanced Data", 
+                "Handle Outliers"
+            ]
+            selected_preprocess = st.selectbox(
+                "Choose a preprocessing step", 
+                preprocess_options,
+                help="Select a preprocessing technique to apply to the dataset."
+            )
             st.session_state['selected_preprocess'] = selected_preprocess
 
+        # Handle different preprocessing techniques
         if selected_preprocess == "Remove Duplicates":
             if st.session_state.get('duplicates_removed', False):
                 st.warning("No duplicates found. You've already removed duplicates.")
@@ -443,6 +460,7 @@ def data_preprocessing_page():
                     st.session_state['show_before_after_button'] = True
                     st.session_state['show_save_button'] = True
 
+        # Show Before and After button
         if st.session_state.get('show_before_after_button', False):
             with st.container(border=True):
                 if st.button("Show Before and After"):
@@ -454,21 +472,28 @@ def data_preprocessing_page():
                         st.write("### After Preprocessing")
                         st.dataframe(st.session_state.df_preprocessed)
 
+        # Show Save to Database and Visualization buttons in columns
         if st.session_state.get('show_save_button', False):
-            with st.container(border=True):
+            col1, col2 = st.columns([6,1])
+            
+            with col1:
                 if st.button("Save to Database"):
                     dataset_db = Dataset()
-
                     base_name, extension = dataset_name.rsplit('.', 1)
                     new_dataset_name = f"{base_name}_preprocessed.{extension}"
-
                     dataset_db.save_to_database(
                         new_dataset_name,
                         'csv',
                         len(st.session_state.df_preprocessed),
                         st.session_state.df_preprocessed.to_csv(index=False).encode()
                     )
-                    st.success(f"Preprocessed dataset saved as '{new_dataset_name}' in the database.")
+                    st.success(f"Preprocessed dataset saved as '{new_dataset_name}' in the database.")  
+                    
+            with col2:
+                if st.button("Go to Visualization"):
+                    st.session_state.df_to_visualize = st.session_state.df_preprocessed  # Store preprocessed dataset for visualization
+                    st.session_state.dataset_name_to_visualize = st.session_state.dataset_name_to_preprocess
+                    st.switch_page("pages/data_visualization.py")
 
     else:
         st.warning("No dataset selected for preprocessing. Please ensure you're navigating from the appropriate page where dataset is uploaded or summarized.")
