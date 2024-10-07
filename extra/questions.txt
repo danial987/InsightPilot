@@ -1,0 +1,48 @@
+Here is a list of dataset-related questions you can add to your `Questions.txt` file for the chatbot:
+
+### General Dataset Questions:
+1. What is the dataset summary?
+2. How many rows are in the dataset?
+3. How many columns are in the dataset?
+4. What are the numerical features?
+5. What are the categorical features?
+6. What is the correlation matrix?
+7. What is the memory usage of the dataset?
+8. What is the average record size in memory?
+9. Show the first rows of the dataset.
+10. Show the last rows of the dataset.
+11. Show the middle rows of the dataset.
+
+### Numerical Features:
+12. Show the numerical analysis of the dataset.
+13. What are the most frequent values in the numerical features?
+14. Show the distribution of numerical features.
+15. Show histograms for numerical features.
+16. Show skewness for numerical features.
+17. Show kurtosis for numerical features.
+18. What are the basic statistics for numerical features?
+
+### Categorical Features:
+19. Show the categorical analysis of the dataset.
+20. What are the most frequent categories in [column_name]?
+21. Show the top 5 categories in [column_name].
+22. What is the distribution of categorical features?
+23. How many unique values are in [column_name]?
+
+### Data Quality and Warnings:
+24. How many missing values are in the dataset?
+25. How many duplicate rows are in the dataset?
+26. Which features have missing values?
+27. Which features have duplicate rows?
+28. Are there any warnings in the dataset?
+29. Which features have high cardinality?
+30. Which features are highly skewed?
+
+### Dataset Structure and Description:
+31. What are the data types of the features?
+32. Describe the dataset.
+33. Show the variable types in the dataset.
+34. Show the feature names.
+35. What is the most frequent value in [column_name]?
+
+These questions should provide a comprehensive set of inquiries that users can ask about their dataset. Let me know if you'd like to expand or customize this list further!

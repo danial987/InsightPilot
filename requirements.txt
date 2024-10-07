@@ -12,3 +12,6 @@ category_encoders==2.6.4
 imbalanced-learn==0.12.3
 streamlit_elements==0.1.0
 kaggle==1.6.17
+transformers==4.45.1
+torch==2.4.1
+streamlit-option-menu==0.3.13

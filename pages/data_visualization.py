@@ -4,13 +4,12 @@ import plotly.express as px
 import plotly.graph_objects as go
 import io
 from statsmodels.graphics.mosaicplot import mosaic
+import numpy as np
 
-# Interface for Visualization Strategy
 class IVisualizationStrategy:
     def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
         raise NotImplementedError("Visualization strategies must implement the plot method.")
 
-# Concrete strategy: Count Plot (New)
 class CountPlot(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
         if x_column:
@@ -33,7 +32,6 @@ class CountPlot(IVisualizationStrategy):
         else:
             st.warning("Please select a valid column for the Count Plot.")
 
-# Concrete strategy: Pie Chart
 class PieChart(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
         if y_columns:
@@ -57,12 +55,53 @@ class PieChart(IVisualizationStrategy):
 
             st.plotly_chart(fig)
         else:
-            st.warning("Please select at least one feature to generate a pie chart.")
+            fig = go.Figure()
+            fig.add_annotation(
+                text="No features selected for Pie Chart.",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5, showarrow=False,
+                font=dict(family=font_family, size=font_size, color="red")
+            )
+            fig.update_layout(
+                title=dict(text=chart_title, font=dict(family=font_family, size=font_size)),
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
+            )
+            st.plotly_chart(fig)
 
-# Concrete strategy: Bar Chart
 class BarChart(IVisualizationStrategy):
-    def plot(self, df: pd.DataFrame, x_column: str, y_columns: list, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
-        if x_column and y_columns:
+    def plot(self, df: pd.DataFrame, x_column: str, y_columns: list, z_column: str = None, 
+             show_legend: bool = True, show_labels: bool = True, chart_title: str = "", 
+             color_scheme: str = "Viridis", font_family: str = "Arial", font_size: int = 14, 
+             is_3d: bool = False) -> None:
+        
+        if is_3d and z_column:
+            fig = go.Figure()
+
+            x = df[x_column]
+            y = df[y_columns[0]]
+            z = df[z_column]
+
+            fig.add_trace(go.Mesh3d(
+                x=np.repeat(x, 4), 
+                y=np.repeat(y, 4), 
+                z=[item for i in range(len(z)) for item in [0, 0, z[i], z[i]]],
+                intensity=z,  
+                colorscale='Viridis', 
+                opacity=0.5
+            ))
+
+            fig.update_layout(
+                scene=dict(
+                    xaxis_title=x_column,
+                    yaxis_title=y_columns[0],
+                    zaxis_title=z_column
+                ),
+                title=dict(text=chart_title, font=dict(family=font_family, size=font_size)),
+                showlegend=show_legend
+            )
+
+        else:
             color_list = getattr(px.colors.qualitative, color_scheme, px.colors.qualitative.Plotly)
 
             fig = px.bar(df, x=x_column, y=y_columns, title=chart_title, color_discrete_sequence=color_list)
@@ -76,11 +115,8 @@ class BarChart(IVisualizationStrategy):
             if show_labels:
                 fig.update_traces(texttemplate='%{y:.2s}', textposition='auto')
 
-            st.plotly_chart(fig)
-        else:
-            st.warning("Please select both X and Y columns to generate a bar chart.")
+        st.plotly_chart(fig)
 
-# Concrete strategy: Line Chart (2D and 3D)
 class LineChart(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str, y_columns: list, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
         if x_column and y_columns:
@@ -128,7 +164,6 @@ class LineChart(IVisualizationStrategy):
         else:
             st.warning("Please select an X-axis column and at least one Y-axis column to generate a line chart.")
 
-# Concrete strategy: Scatter Plot (2D and 3D)
 class ScatterPlot(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str, y_columns: list, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
         if x_column and y_columns:
@@ -175,7 +210,6 @@ class ScatterPlot(IVisualizationStrategy):
         else:
             st.warning("Please select an X-axis column and at least one Y-axis column to generate a scatter plot.")
 
-# Concrete strategy: Box Plot
 class BoxPlot(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str, y_columns: list, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
         if x_column and y_columns:
@@ -193,7 +227,6 @@ class BoxPlot(IVisualizationStrategy):
         else:
             st.warning("Please select an X-axis column and at least one Y-axis column to generate a box plot.")
 
-# Concrete strategy: Histogram
 class Histogram(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
         if x_column and y_columns:
@@ -211,10 +244,9 @@ class Histogram(IVisualizationStrategy):
         else:
             st.warning("Please select an X-axis column and one Y-axis column to generate a histogram.")
 
-# Concrete strategy: Correlation Matrix with Plotly (including 3D support)
 class CorrelationMatrix(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Viridis", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
-        # Map color scheme to valid Plotly colorscales
+
         colorscale_map = {
             "Plotly": "plotly3",
             "D3": "d3",
@@ -223,25 +255,20 @@ class CorrelationMatrix(IVisualizationStrategy):
             "Alphabet": "speed",
             "Dark24": "darkmint",
             "Set3": "matter",
-            "Viridis": "viridis"  # Default value
+            "Viridis": "viridis" 
         }
 
-        # Filter numeric columns
         numeric_df = df[y_columns] if y_columns else df.select_dtypes(include=['number'])
 
-        # Ensure there are enough numeric columns for correlation matrix
         if numeric_df.shape[1] < 2:
             st.warning("Not enough numeric columns for correlation matrix.")
             return
 
-        # Calculate the correlation matrix
         correlation_matrix = numeric_df.corr()
 
-        # Get the valid colorscale for 3D or 2D from the map
         colorscale = colorscale_map.get(color_scheme, "Viridis")
 
         if is_3d:
-            # Create a 3D surface plot for the correlation matrix
             fig = go.Figure(data=[go.Surface(z=correlation_matrix.values, colorscale=colorscale)])
 
             fig.update_layout(
@@ -256,14 +283,13 @@ class CorrelationMatrix(IVisualizationStrategy):
                 margin=dict(l=65, r=50, b=65, t=90)
             )
         else:
-            # Create a heatmap of the correlation matrix for 2D
             fig = go.Figure(data=go.Heatmap(
                 z=correlation_matrix.values,
                 x=correlation_matrix.columns,
                 y=correlation_matrix.columns,
                 colorscale=colorscale,
-                text=correlation_matrix.values,  # Show correlation values
-                hoverinfo="text"  # Show values when hovered
+                text=correlation_matrix.values, 
+                hoverinfo="text"  
             ))
 
             if show_labels:
@@ -277,22 +303,17 @@ class CorrelationMatrix(IVisualizationStrategy):
                 showlegend=show_legend
             )
 
-        # Render the correlation matrix using Streamlit
         st.plotly_chart(fig)
 
-
-# Concrete strategy: HeatMap (2D and 3D)
 class HeatMap(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Viridis", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
         if y_columns is None or len(y_columns) < 2:
             st.warning("Please select at least two numeric columns to generate a heatmap.")
             return
 
-        # Filter numeric columns
         numeric_df = df[y_columns].select_dtypes(include=['number'])
         correlation_matrix = numeric_df.corr()
 
-        # Map color scheme to valid colorscale
         colorscale_map = {
             'Plotly': 'plotly3',
             'D3': 'd3',
@@ -341,43 +362,37 @@ class HeatMap(IVisualizationStrategy):
 class MosaicPlot(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
         if x_column and y_columns:
-            # Limit to top N categories for faster processing
-            top_n = 5
+
+            top_n = 10
             df_filtered = df[df[x_column].isin(df[x_column].value_counts().index[:top_n])]
             df_filtered = df_filtered[df_filtered[y_columns[0]].isin(df_filtered[y_columns[0]].value_counts().index[:top_n])]
 
             try:
-                # Group the data and calculate the proportions of each category
                 df_grouped = df_filtered.groupby([x_column, y_columns[0]]).size().reset_index(name='Count')
 
             except ValueError as e:
-                # Handle the duplicate column error
                 st.error(f"Error: {str(e)}. Please ensure the columns used for grouping don't conflict with existing column names.")
                 return
 
-            # Calculate the proportion for each group
             df_grouped['Proportion'] = df_grouped.groupby(x_column)['Count'].transform(lambda x: x / x.sum())
 
-            # Create a stacked bar chart using Plotly
             fig = px.bar(
                 df_grouped,
                 x=x_column,
                 y='Proportion',
                 color=y_columns[0],
-                text='Count',  # Show the actual counts
+                text='Count', 
                 title=chart_title,
                 labels={'Proportion': 'Proportion'},
                 color_discrete_sequence=getattr(px.colors.qualitative, color_scheme, px.colors.qualitative.Plotly)
             )
 
-            # Update layout for font, legend, and add text labels for proportions
             fig.update_layout(
                 title=dict(text=chart_title, font=dict(family=font_family, size=font_size)),
                 legend=dict(font=dict(family=font_family, size=font_size)),
                 showlegend=show_legend
             )
 
-            # Show the values on the bars (Count values)
             if show_labels:
                 fig.update_traces(texttemplate='%{text:.2s}', textposition='auto')
 
@@ -386,8 +401,196 @@ class MosaicPlot(IVisualizationStrategy):
         else:
             st.warning("Please select valid X and Y columns for the Mosaic plot.")
 
+class TreeMap(IVisualizationStrategy):
+    def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, top_n: int = 5, is_3d: bool = False) -> None:
+    
+        if df.columns.duplicated().any():
+            st.error(f"Error: The DataFrame contains non-unique column labels. Please remove or rename duplicate columns.")
+            return
+        
+        if x_column and y_columns:
+            y_columns = [col for col in y_columns if col != x_column]
+            
+            if not y_columns:
+                st.warning("Please select at least one Y-axis column that is different from the X-axis column.")
+                return
 
-# Context class for Visualization
+            df_filtered = df[df[x_column].isin(df[x_column].value_counts().index[:top_n])]
+            for y_col in y_columns:
+                df_filtered = df_filtered[df_filtered[y_col].isin(df_filtered[y_col].value_counts().index[:top_n])]
+
+            try:
+                df_grouped = df_filtered.groupby([x_column] + y_columns).size().reset_index(name='Count')
+
+            except ValueError as e:
+                st.error(f"Error: {str(e)}. Please ensure columns for grouping don't conflict with existing column names.")
+                return
+
+            color_list = getattr(px.colors.qualitative, color_scheme, px.colors.qualitative.Plotly)
+
+            fig = px.treemap(
+                df_grouped,
+                path=[px.Constant(chart_title), x_column] + y_columns,
+                values='Count',
+                title=chart_title,
+                color=x_column,
+                color_discrete_sequence=color_list
+            )
+
+            fig.update_layout(
+                title=dict(
+                    text=chart_title, 
+                    font=dict(family=font_family, size=font_size)
+                ),
+                font=dict(
+                    family=font_family,
+                    size=font_size
+                ),
+                legend=dict(
+                    font=dict(family=font_family, size=font_size)
+                ),
+                showlegend=show_legend
+            )
+
+            st.plotly_chart(fig)
+
+        else:
+            st.warning("Please select valid X and Y columns for the Tree Map.")
+
+
+class DensityPlot(IVisualizationStrategy):
+    def plot(self, df: pd.DataFrame, x_column: str, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Viridis", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
+        if x_column and y_columns:
+            if len(y_columns) > 1:
+                st.warning("Density plots only support a single Y-axis feature. Please select one Y-axis feature.")
+                return
+
+            if is_3d and z_column:
+                valid_3d_colorscales = [
+                    'aggrnyl', 'agsunset', 'algae', 'amp', 'armyrose', 'balance', 'blackbody', 'bluered', 
+                    'blues', 'blugrn', 'bluyl', 'brbg', 'brwnyl', 'bugn', 'bupu', 'burg', 'burgyl', 
+                    'cividis', 'curl', 'darkmint', 'deep', 'delta', 'dense', 'earth', 'edge', 'electric', 
+                    'emrld', 'fall', 'geyser', 'gnbu', 'gray', 'greens', 'greys', 'haline', 'hot', 'hsv', 
+                    'ice', 'icefire', 'inferno', 'jet', 'magenta', 'magma', 'matter', 'mint', 'mrybm', 
+                    'mygbm', 'oranges', 'orrd', 'oryel', 'oxy', 'peach', 'phase', 'picnic', 'pinkyl', 
+                    'piyg', 'plasma', 'plotly3', 'portland', 'prgn', 'pubu', 'pubugn', 'puor', 'purd', 
+                    'purp', 'purples', 'purpor', 'rainbow', 'rdbu', 'rdgy', 'rdpu', 'rdylbu', 'rdylgn', 
+                    'redor', 'reds', 'solar', 'spectral', 'speed', 'sunset', 'sunsetdark', 'teal', 
+                    'tealgrn', 'tealrose', 'tempo', 'temps', 'thermal', 'tropic', 'turbid', 'turbo', 
+                    'twilight', 'viridis', 'ylgn', 'ylgnbu', 'ylorbr', 'ylorrd'
+                ]
+                if color_scheme.lower() not in valid_3d_colorscales:
+                    color_scheme = 'Viridis'  
+
+                fig = go.Figure(data=go.Isosurface(
+                    x=df[x_column],
+                    y=df[y_columns[0]],
+                    z=df[z_column],
+                    isomin=0.1, 
+                    isomax=1.0,
+                    surface_count=10,
+                    colorscale=color_scheme,
+                ))
+
+                fig.update_layout(
+                    title=dict(text=chart_title, font=dict(family=font_family, size=font_size)),
+                    scene=dict(
+                        xaxis_title=x_column,
+                        yaxis_title=y_columns[0],
+                        zaxis_title=z_column
+                    ),
+                    showlegend=show_legend
+                )
+
+            else:
+                fig = px.density_contour(df, x=x_column, y=y_columns[0], title=chart_title)
+
+                fig.update_layout(
+                    title=dict(text=chart_title, font=dict(family=font_family, size=font_size)),
+                    showlegend=show_legend
+                )
+
+                if show_labels:
+                    fig.add_scatter(x=df[x_column], y=df[y_columns[0]], mode='markers', marker=dict(color='rgba(0,0,0,0.5)'))
+
+            st.plotly_chart(fig)
+        else:
+            st.warning("Please select valid X, Y, and optionally Z columns for the density plot.")
+
+
+class ConePlot(IVisualizationStrategy):
+    def plot(self, df: pd.DataFrame, x_column: str, y_columns: list = None, z_column: str = None, 
+             show_legend: bool = True, show_labels: bool = True, chart_title: str = "", 
+             color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
+        if x_column and y_columns and z_column:
+            fig = go.Figure(go.Cone(
+                x=df[x_column],
+                y=df[y_columns[0]],  
+                z=df[z_column],
+                u=df[x_column], 
+                v=df[y_columns[0]],  
+                w=df[z_column],  
+                colorscale='Viridis',
+                showscale=True
+            ))
+
+            fig.update_layout(
+                title=dict(text=chart_title, font=dict(family=font_family, size=font_size)),
+                scene=dict(
+                    xaxis_title=x_column,
+                    yaxis_title=y_columns[0],
+                    zaxis_title=z_column
+                ),
+                showlegend=show_legend
+            )
+
+            st.plotly_chart(fig)
+        else:
+            st.warning("Please select X, Y, and Z columns for the 3D Cone Plot.")
+
+
+class StreamlinePlot(IVisualizationStrategy):
+    def plot(self, df: pd.DataFrame, x_column: str, y_columns: list = None, z_column: str = None, 
+             show_legend: bool = True, show_labels: bool = True, chart_title: str = "", 
+             color_scheme: str = "Viridis", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
+        
+        colorscale_map = {
+            "Viridis": "Viridis",
+            "Plasma": "Plasma",
+            "Inferno": "Inferno",
+            "Cividis": "Cividis",
+            "Turbo": "Turbo",
+            "Rainbow": "Rainbow",
+            "Plotly": "Viridis" 
+        }
+
+        if x_column and y_columns and z_column:
+            valid_colorscale = colorscale_map.get(color_scheme, 'Viridis')
+
+            fig = go.Figure()
+
+            fig.add_trace(go.Scatter3d(
+                x=df[x_column],
+                y=df[y_columns[0]], 
+                z=df[z_column],
+                mode='lines',
+                line=dict(width=3, color=df[z_column], colorscale=valid_colorscale),
+            ))
+
+            fig.update_layout(
+                title=dict(text=chart_title, font=dict(family=font_family, size=font_size)),
+                scene=dict(
+                    xaxis_title=x_column,
+                    yaxis_title=y_columns[0],
+                    zaxis_title=z_column
+                ),
+                showlegend=show_legend
+            )
+
+            st.plotly_chart(fig)
+        else:
+            st.warning("Please select X, Y, and Z columns for the 3D Streamline Plot.")
+
 class VisualizationContext:
     def __init__(self, strategy: IVisualizationStrategy):
         self._strategy = strategy
@@ -395,10 +598,13 @@ class VisualizationContext:
     def set_strategy(self, strategy: IVisualizationStrategy):
         self._strategy = strategy
 
-    def create_visualization(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False):
-        self._strategy.plot(df, x_column, y_columns, z_column, show_legend, show_labels, chart_title, color_scheme, font_family, font_size, is_3d)
+    def create_visualization(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False, top_n: int = None):
+        # Pass top_n if provided
+        if top_n is not None:
+            self._strategy.plot(df, x_column, y_columns, z_column, show_legend, show_labels, chart_title, color_scheme, font_family, font_size, top_n, is_3d)
+        else:
+            self._strategy.plot(df, x_column, y_columns, z_column, show_legend, show_labels, chart_title, color_scheme, font_family, font_size, is_3d)
 
-# Main page for data visualization
 def load_css():
     with open('static/style.css') as f:
         css_code = f.read()
@@ -408,7 +614,6 @@ def data_visualization_page():
     load_css()
     st.header('Data Visualization', divider='violet')
 
-    # Initialize session state variables if they don't exist
     if 'x_column' not in st.session_state:
         st.session_state.x_column = None
     if 'y_columns' not in st.session_state:
@@ -448,7 +653,10 @@ def data_visualization_page():
             col1, col2 = st.columns([1, 2.5])
 
         with col1:
-            chart_type = st.selectbox("Select Chart Type", ["Pie Chart", "Bar Chart", "Line Chart", "Scatter Plot", "Box Plot", "Histogram", "Correlation Matrix", "HeatMap", "Mosaic Plot", "Count Plot"], help="Choose a chart type.")
+            chart_type = st.selectbox("Select Chart Type", ["Pie Chart", "Bar Chart", "Line Chart", "Scatter Plot", 
+                                                "Box Plot", "Histogram", "Correlation Matrix", "HeatMap", 
+                                                "Mosaic Plot", "Count Plot", "Tree Map", "Density Plot", 
+                                                "3D Cone Plot", "Streamline Plot"], help="Choose a chart type.")
 
             if chart_type == "Count Plot":
                 context = VisualizationContext(CountPlot())
@@ -473,25 +681,25 @@ def data_visualization_page():
                 st.session_state.font_family = font_family
                 st.session_state.font_size = font_size
 
-            if chart_type == "Pie Chart":
+            elif chart_type == "Pie Chart":
                 context = VisualizationContext(PieChart())
-
+            
                 categorical_columns = df.select_dtypes(include=['object', 'category']).columns.tolist()
-
+            
                 if len(categorical_columns) == 0:
                     st.warning("No categorical columns found in the dataset for pie chart.")
                     return
-
+            
                 selected_columns = st.multiselect("Select categorical features for Pie Chart", categorical_columns)
-
+            
                 col3, col4 = st.columns(2)
                 with col3:
                     show_legend = st.checkbox("Show Legend", value=True)
                 with col4:
                     show_labels = st.checkbox("Show Labels", value=True)
-
+            
                 chart_title = st.text_input("Chart Title", value="Pie Chart")
-
+            
                 color_schemes = ['Plotly', 'D3', 'G10', 'T10', 'Alphabet', 'Dark24', 'Set3']
                 color_scheme = st.selectbox("Select Color Scheme", color_schemes)
                 font_family = st.selectbox("Font Family", ["Arial", "Courier New", "Times New Roman", "Verdana"])
@@ -507,25 +715,30 @@ def data_visualization_page():
 
             elif chart_type == "Bar Chart":
                 context = VisualizationContext(BarChart())
-
+            
                 numerical_columns = df.select_dtypes(include=['number']).columns.tolist()
-
+            
                 if len(numerical_columns) == 0:
                     st.warning(f"No numerical columns found in the dataset for {chart_type}.")
                     return
-
+            
                 x_column = st.selectbox("Select X-axis", numerical_columns)
                 y_columns = st.multiselect("Select Y-axis", numerical_columns)
-
+            
+                is_3d = st.checkbox("Enable 3D Bar Chart")
+                z_column = st.selectbox("Select Z-axis for 3D Chart", numerical_columns) if is_3d else None
+            
                 chart_title = st.text_input("Chart Title", value=f"{chart_type}")
-
+            
                 color_schemes = ['Plotly', 'D3', 'G10', 'T10', 'Alphabet', 'Dark24', 'Set3']
                 color_scheme = st.selectbox("Select Color Scheme", color_schemes)
                 font_family = st.selectbox("Font Family", ["Arial", "Courier New", "Times New Roman", "Verdana"])
                 font_size = st.slider("Font Size", 10, 30, value=14)
-
+            
                 st.session_state.x_column = x_column
                 st.session_state.y_columns = y_columns
+                st.session_state.z_column = z_column
+                st.session_state.is_3d = is_3d
                 st.session_state.chart_title = chart_title
                 st.session_state.color_scheme = color_scheme
                 st.session_state.font_family = font_family
@@ -543,7 +756,6 @@ def data_visualization_page():
                 x_column = st.selectbox("Select X-axis", numerical_columns)
                 y_columns = st.multiselect("Select Y-axis", numerical_columns) if chart_type != "Histogram" else [st.selectbox("Select Y-axis", numerical_columns)]
 
-                # Remove unnecessary toggles for specific charts
                 show_legend = False if chart_type == "Scatter Plot" else True
                 show_labels = False if chart_type == "Bar Chart" or chart_type == "Box Plot" else True
                 is_3d = st.checkbox("Enable 3D Chart") if chart_type in ["Line Chart", "Scatter Plot"] else False
@@ -576,7 +788,6 @@ def data_visualization_page():
 
                 selected_columns = st.multiselect("Select features for Correlation Matrix", numerical_columns, default=numerical_columns)
 
-                # Show 3D chart toggle directly after selecting features
                 if selected_columns:
                     is_3d = st.checkbox("Enable 3D Chart", value=False)
 
@@ -627,7 +838,6 @@ def data_visualization_page():
 
                 x_column = st.selectbox("Select X-axis", categorical_columns)
 
-                # Filter Y-axis options to remove the selected X-axis option
                 y_columns = st.multiselect("Select Y-axis", [col for col in categorical_columns if col != x_column])
 
                 if not x_column or not y_columns:
@@ -635,19 +845,148 @@ def data_visualization_page():
                     return
 
                 chart_title = st.text_input("Chart Title", value="Mosaic Plot")
+                font_family = st.selectbox("Font Family", ["Arial", "Courier New", "Times New Roman", "Verdana"])
+                font_size = st.slider("Font Size", 10, 30, value=14)
 
                 st.session_state.x_column = x_column
                 st.session_state.y_columns = y_columns
                 st.session_state.chart_title = chart_title
+                st.session_state.font_family = font_family
+                st.session_state.font_size = font_size
+
+            elif chart_type == "Tree Map":
+                context = VisualizationContext(TreeMap() if chart_type == "Tree Map" else MosaicPlot())
+
+                categorical_columns = df.select_dtypes(include=['object', 'category']).columns.tolist()
+
+                if len(categorical_columns) == 0:
+                    st.warning(f"No categorical columns found in the dataset for {chart_type}.")
+                    return
+
+                x_column = st.selectbox("Select X-axis", categorical_columns)
+
+                y_columns = st.multiselect("Select Y-axis", [col for col in categorical_columns if col != x_column])
+
+                if x_column:
+                    max_unique_x = df[x_column].nunique()
+                else:
+                    max_unique_x = 1
+
+                if y_columns:
+                    max_unique_y = df[y_columns[0]].nunique()
+                else:
+                    max_unique_y = 1
+
+                max_categories = min(max_unique_x, max_unique_y)
+
+                top_n = st.slider("Select the number of top categories to display", min_value=1, max_value=max_categories, value=5)
+
+                chart_title = st.text_input("Chart Title", value=f"{chart_type}")
+
+
+                font_family = st.selectbox("Font Family", ["Arial", "Courier New", "Times New Roman", "Verdana"])
+                font_size = st.slider("Font Size", 10, 30, value=14)
+
+                st.session_state.x_column = x_column
+                st.session_state.y_columns = y_columns
+                st.session_state.chart_title = chart_title
+                st.session_state.font_family = font_family
+                st.session_state.font_size = font_size
+
+            elif chart_type == "Density Plot":
+                context = VisualizationContext(DensityPlot())
+                
+                numerical_columns = df.select_dtypes(include=['number']).columns.tolist()
+            
+                if len(numerical_columns) == 0:
+                    st.warning("No numerical columns found in the dataset for density plot.")
+                    return
+            
+                x_column = st.selectbox("Select X-axis", numerical_columns)
+                y_columns = [st.selectbox("Select Y-axis", numerical_columns)]  
+
+                is_3d = st.checkbox("Enable 3D Density Plot")
+            
+                z_column = st.selectbox("Select Z-axis", numerical_columns) if is_3d else None  
+            
+                chart_title = st.text_input("Chart Title", value="Density Plot")
+            
+                font_family = st.selectbox("Font Family", ["Arial", "Courier New", "Times New Roman", "Verdana"])
+                font_size = st.slider("Font Size", 10, 30, value=14)
+            
+                st.session_state.x_column = x_column
+                st.session_state.y_columns = y_columns  
+                st.session_state.z_column = z_column 
+                st.session_state.is_3d = is_3d 
+                st.session_state.chart_title = chart_title
+                st.session_state.font_family = font_family
+                st.session_state.font_size = font_size
+            
+            elif chart_type == "3D Cone Plot":
+                context = VisualizationContext(ConePlot())
+                
+                numerical_columns = df.select_dtypes(include=['number']).columns.tolist()
+            
+                if len(numerical_columns) < 6:
+                    st.warning("3D Cone Plot requires at least 6 numerical columns (X, Y, Z, U, V, W).")
+                    return
+            
+                x_column = st.selectbox("Select X-axis", numerical_columns)
+                y_column = st.selectbox("Select Y-axis", numerical_columns)
+                z_column = st.selectbox("Select Z-axis", numerical_columns)
+
+                u_column = st.selectbox("Select U (vector X)", numerical_columns)
+                v_column = st.selectbox("Select V (vector Y)", numerical_columns)
+                w_column = st.selectbox("Select W (vector Z)", numerical_columns)
+            
+                chart_title = st.text_input("Chart Title", value="3D Cone Plot")
+            
+                font_family = st.selectbox("Font Family", ["Arial", "Courier New", "Times New Roman", "Verdana"])
+                font_size = st.slider("Font Size", 10, 30, value=14)
+            
+                st.session_state.x_column = x_column
+                st.session_state.y_column = y_column
+                st.session_state.z_column = z_column
+                st.session_state.u_column = u_column
+                st.session_state.v_column = v_column
+                st.session_state.w_column = w_column
+                st.session_state.chart_title = chart_title
+                st.session_state.font_family = font_family
+                st.session_state.font_size = font_size
+
+            elif chart_type == "Streamline Plot":
+                context = VisualizationContext(StreamlinePlot())
+            
+                numerical_columns = df.select_dtypes(include=['number']).columns.tolist()
+            
+                if len(numerical_columns) == 0:
+                    st.warning("No numerical columns found in the dataset for Streamline plot.")
+                    return
+            
+                x_column = st.selectbox("Select X-axis", numerical_columns)
+                y_columns = [st.selectbox("Select Y-axis", numerical_columns)] 
+                z_column = st.selectbox("Select Z-axis", numerical_columns)
+            
+                chart_title = st.text_input("Chart Title", value="Streamline Plot")
+            
+                font_family = st.selectbox("Font Family", ["Arial", "Courier New", "Times New Roman", "Verdana"])
+                font_size = st.slider("Font Size", 10, 30, value=14)
+            
+                st.session_state.x_column = x_column
+                st.session_state.y_columns = y_columns 
+                st.session_state.z_column = z_column
+                st.session_state.chart_title = chart_title
+                st.session_state.font_family = font_family
+                st.session_state.font_size = font_size
 
         with col2:
             with st.spinner("Generating Chart..."):
                 if chart_type == "Pie Chart" and st.session_state.selected_columns:
                     st.write("### Chart Preview")
                     context.create_visualization(
-                        df, 
-                        None, 
-                        st.session_state.selected_columns, 
+                        df,
+                        None,
+                        st.session_state.selected_columns,
                         None,
                         st.session_state.show_legend,
                         st.session_state.show_labels,
@@ -670,6 +1009,7 @@ def data_visualization_page():
                         font_family=st.session_state.font_family,
                         font_size=st.session_state.font_size
                     )
+
                 elif chart_type in ["Bar Chart", "Line Chart", "Scatter Plot", "Box Plot", "Histogram"] and st.session_state.x_column and st.session_state.y_columns:
                     st.write("### Chart Preview")
                     context.create_visualization(
@@ -685,6 +1025,7 @@ def data_visualization_page():
                         st.session_state.font_size,
                         st.session_state.is_3d
                     )
+
                 elif chart_type == "Correlation Matrix" and st.session_state.selected_columns:
                     st.write("### Chart Preview")
                     context.create_visualization(
@@ -713,6 +1054,23 @@ def data_visualization_page():
                         font_size=st.session_state.font_size,
                         is_3d=st.session_state.is_3d
                     )
+               
+                elif chart_type == "Tree Map" and st.session_state.x_column and st.session_state.y_columns:
+                    st.write("### Chart Preview")
+                    context.create_visualization(
+                        df,
+                        st.session_state.x_column,
+                        st.session_state.y_columns, 
+                        None,
+                        show_legend=False,
+                        show_labels=True,
+                        chart_title=st.session_state.chart_title,
+                        color_scheme=st.session_state.color_scheme,
+                        font_family=st.session_state.font_family,
+                        font_size=st.session_state.font_size,
+                        top_n=top_n 
+                    )
+                    
                 elif chart_type == "Mosaic Plot" and st.session_state.x_column and st.session_state.y_columns:
                     st.write("### Chart Preview")
                     context.create_visualization(
@@ -722,9 +1080,55 @@ def data_visualization_page():
                         None,
                         show_legend=False,
                         show_labels=True,
-                        chart_title=st.session_state.chart_title
+                        chart_title=st.session_state.chart_title,
+                        color_scheme=st.session_state.color_scheme,
+                        font_family=st.session_state.font_family,
+                        font_size=st.session_state.font_size
                     )
 
+                elif chart_type == "Density Plot" and st.session_state.x_column and st.session_state.y_columns:
+                    st.write("### Chart Preview")
+                    context.create_visualization(
+                        df,
+                        st.session_state.x_column,
+                        st.session_state.y_columns,
+                        st.session_state.z_column,
+                        show_legend=False,
+                        show_labels=True,
+                        chart_title=st.session_state.chart_title,
+                        color_scheme=st.session_state.color_scheme,
+                        font_family=st.session_state.font_family,
+                        font_size=st.session_state.font_size,
+                        is_3d=st.session_state.is_3d
+                    )
+
+                elif chart_type == "3D Cone Plot" and st.session_state.x_column and st.session_state.y_column and st.session_state.z_column and st.session_state.u_column and st.session_state.v_column and st.session_state.w_column:
+                    st.write("### Chart Preview")
+                    context.create_visualization(
+                        df,
+                        st.session_state.x_column,
+                        [st.session_state.u_column, st.session_state.v_column, st.session_state.w_column], 
+                        st.session_state.z_column,
+                        show_legend=False,
+                        show_labels=True,
+                        chart_title=st.session_state.chart_title,
+                        font_family=st.session_state.font_family,
+                        font_size=st.session_state.font_size
+                    )
+
+                elif chart_type == "Streamline Plot" and st.session_state.x_column and st.session_state.y_columns and st.session_state.z_column:
+                    st.write("### Chart Preview")
+                    context.create_visualization(
+                        df,
+                        st.session_state.x_column,
+                        st.session_state.y_columns,
+                        st.session_state.z_column,
+                        show_legend=False,
+                        show_labels=True,
+                        chart_title=st.session_state.chart_title,
+                        font_family=st.session_state.font_family,
+                        font_size=st.session_state.font_size
+                    )
 
     else:
         st.warning("No dataset available for visualization. Please ensure you've completed the preprocessing step and saved the dataset.")

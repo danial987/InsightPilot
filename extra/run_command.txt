@@ -1,0 +1,8 @@
+streamlit run streamlit_app.py
+
+
+# username = "postgres.qshtpwzpnifujdbwteqe"
+# password = "Insightpilot3421$"
+# host = "aws-0-ap-southeast-1.pooler.supabase.com"
+# port = "6543"
+# database = "postgres"

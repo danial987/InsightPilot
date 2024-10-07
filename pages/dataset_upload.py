@@ -191,7 +191,7 @@ def dataset_upload_page():
                             action_key = f"action_{ds.id}"
                             action = st.selectbox(
                                 "", 
-                                ["Select", "View Summary", "Preprocessing", "Visualization", "Chat", "Share", "Rename", "Delete"], 
+                                ["Select", "View Summary", "Preprocessing", "Visualization", "Chat", "Rename", "Delete"], 
                                 key=action_key, 
                                 index=st.session_state.rename_action_state.get(ds.id, 0)
                             )
@@ -211,15 +211,23 @@ def dataset_upload_page():
                                 st.session_state.dataset_name_to_visualize = dataset.name 
                                 st.switch_page("pages/data_visualization.py") 
 
+                            elif action == "Chat":
+                                dataset = dataset_db.get_dataset_by_id(ds.id)
+                                st.session_state.df_to_chat = dataset.data
+                                st.session_state.dataset_name_to_chat = dataset.name
+                                st.switch_page("pages/chatbot.py")
+
                             elif action == "Delete":
                                 delete_dataset(ds.id)
+
                             elif action == "Rename":
-                                st.session_state.rename_action_state[ds.id] = 6 
+                                st.session_state.rename_action_state[ds.id] = 4
                                 st.session_state['show_rename_dialog'] = True
                                 st.session_state['current_rename_id'] = ds.id
-                                st.session_state['current_rename_name'] = ds.name.split('.')[0]  
+                                st.session_state['current_rename_name'] = ds.name.split('.')[0]
+                                st.rerun()
                             else:
-                                st.session_state.rename_action_state[ds.id] = 0  
+                                st.session_state.rename_action_state[ds.id] = 0 
                         st.write('</div>', unsafe_allow_html=True)
             st.write('</div>', unsafe_allow_html=True)
 
@@ -254,9 +262,9 @@ def view_dataset_summary(dataset_id):
 
 def delete_dataset(dataset_id):
     dataset_db.delete_dataset(dataset_id)
-    st.experimental_rerun()
+    st.rerun()
 
-@st.experimental_dialog("Rename")
+@st.dialog("Rename")
 def show_rename_dialog():
     dataset_id = st.session_state['current_rename_id']
     current_name = st.session_state['current_rename_name']
@@ -264,16 +272,16 @@ def show_rename_dialog():
     col1, col2 = st.columns(2)
     if col1.button("Cancel"):
         st.session_state['show_rename_dialog'] = False
-        st.session_state.rename_action_state[dataset_id] = 0 
-        st.experimental_rerun()
+        st.session_state.rename_action_state[dataset_id] = 0
+        st.rerun()
     if col2.button("Rename"):
         if dataset_db.dataset_exists(new_name):
             st.error("Dataset with this name already exists.")
         else:
             dataset_db.rename_dataset(dataset_id, new_name)
             st.session_state['show_rename_dialog'] = False
-            st.session_state.rename_action_state[dataset_id] = 0  
-            st.experimental_rerun() 
+            st.session_state.rename_action_state[dataset_id] = 0
+            st.rerun()
 
 if 'show_rename_dialog' not in st.session_state:
     st.session_state['show_rename_dialog'] = False
