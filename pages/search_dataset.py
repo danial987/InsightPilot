@@ -7,7 +7,6 @@ import json
 
 class DatasetSearch:
     def __init__(self):
-
         os.environ['KAGGLE_USERNAME'] = "hoorainhabibabbasi" 
         os.environ['KAGGLE_KEY'] = "c6267653dad344a650deac0efd9f6e50"  
 
@@ -120,7 +119,6 @@ class DatasetSearch:
                     st.write(ds.get('lastUpdated', 'N/A'))
                 with col4:
                     if source == 'Kaggle':
-                    
                         download_link = self.create_download_link(ds['id'])
                         if download_link:
                             st.download_button(label="Download", 
@@ -128,22 +126,22 @@ class DatasetSearch:
                                                file_name=download_link['file_name'], 
                                                mime=download_link['mime'])
                     elif source == 'Data.gov':
-
                         if ds['download_urls']:
                             selected_format = st.selectbox(
                                 f"Select format for {ds['title']}",
-                                options=[fmt for fmt, url in ds['download_urls']]
+                                options=[fmt for fmt, url in ds['download_urls']],
+                                key=f"{ds['id']}_selectbox"  # Adding unique key for each selectbox
                             )
                             download_url = next(url for fmt, url in ds['download_urls'] if fmt == selected_format)
                             
+                            # Differentiate between JSON and other formats like CSV
                             if selected_format == "JSON":
-
                                 response = requests.get(download_url)
                                 if response.status_code == 200:
                                     try:
                                         json_data = response.json() 
                                         json_str = json.dumps(json_data, indent=4)  
-                                        st.download_button(label="Download", data=json_str, file_name=f"{ds['title']}.json", mime="application/json")
+                                        st.download_button(label="Download JSON", data=json_str, file_name=f"{ds['title']}.json", mime="application/json")
                                     except json.JSONDecodeError:
                                         st.error("Invalid JSON file format.")
                                 else:
@@ -151,7 +149,7 @@ class DatasetSearch:
                             else:
                                 st.download_button(label="Download", data=download_url, file_name=f"{ds['title']}.{selected_format.lower()}")
                         else:
-                            st.write("No formats.")
+                            st.write("No formats available.")
                 st.write('</div>', unsafe_allow_html=True)
         else:
             st.write("No datasets found.")

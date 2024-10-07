@@ -1,3 +1,4 @@
+
 import streamlit as st
 from st_pages import Page, Section, add_page_title
 from pathlib import Path
@@ -9,7 +10,7 @@ def load_css():
 
 st.set_page_config(page_title="InsightPilot", page_icon="👾")
 
-st.sidebar.image("static/logo.png", width=200) 
+st.sidebar.image("static/logo.png", width=180) 
 
 pages = [
     st.Page("pages/dataset_upload.py", title="Dataset Upload", icon="⬆️"),

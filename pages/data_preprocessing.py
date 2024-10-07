@@ -9,6 +9,7 @@ from imblearn.under_sampling import RandomUnderSampler
 from imblearn.combine import SMOTEENN
 from database import Dataset
 
+
 class IPreprocessingStrategy:
     def apply(self, df: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError("Preprocessing strategies must implement the apply method.")
@@ -32,7 +33,7 @@ class RemoveDuplicates(IPreprocessingStrategy):
         @st.dialog("Handle Duplicates")
         def show_duplicate_dialog():
             duplicate_rows = df[df.duplicated()]
-            st.write("### Duplicates Found (Highlighted in Green):")
+            st.write("### Duplicates Found :")
             styled_duplicates = duplicate_rows.style.apply(lambda x: ['background-color: lightgreen' for _ in x], axis=1)
             st.dataframe(styled_duplicates)
 

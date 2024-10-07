@@ -6,6 +6,7 @@ import io
 from statsmodels.graphics.mosaicplot import mosaic
 import numpy as np
 
+
 class IVisualizationStrategy:
     def plot(self, df: pd.DataFrame, x_column: str = None, y_columns: list = None, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
         raise NotImplementedError("Visualization strategies must implement the plot method.")
@@ -76,6 +77,11 @@ class BarChart(IVisualizationStrategy):
              is_3d: bool = False) -> None:
         
         if is_3d and z_column:
+            # Check if z_column is valid and length matches
+            if z_column not in df.columns or len(df[z_column]) != len(df[x_column]):
+                st.warning(f"The Z column `{z_column}` is invalid or does not match the length of the X and Y columns.")
+                return
+
             fig = go.Figure()
 
             x = df[x_column]
@@ -85,7 +91,7 @@ class BarChart(IVisualizationStrategy):
             fig.add_trace(go.Mesh3d(
                 x=np.repeat(x, 4), 
                 y=np.repeat(y, 4), 
-                z=[item for i in range(len(z)) for item in [0, 0, z[i], z[i]]],
+                z=[item for i in range(len(z)) for item in [0, 0, z.iloc[i], z.iloc[i]]],  # Use iloc for safe indexing
                 intensity=z,  
                 colorscale='Viridis', 
                 opacity=0.5
@@ -116,6 +122,7 @@ class BarChart(IVisualizationStrategy):
                 fig.update_traces(texttemplate='%{y:.2s}', textposition='auto')
 
         st.plotly_chart(fig)
+
 
 class LineChart(IVisualizationStrategy):
     def plot(self, df: pd.DataFrame, x_column: str, y_columns: list, z_column: str = None, show_legend: bool = True, show_labels: bool = True, chart_title: str = "", color_scheme: str = "Plotly", font_family: str = "Arial", font_size: int = 14, is_3d: bool = False) -> None:
@@ -612,6 +619,7 @@ def load_css():
 
 def data_visualization_page():
     load_css()
+
     st.header('Data Visualization', divider='violet')
 
     if 'x_column' not in st.session_state:

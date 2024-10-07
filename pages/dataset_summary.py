@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
+
 def load_css():
     with open('static/style.css') as f:
         css_code = f.read()
@@ -330,6 +331,7 @@ class DatasetSummary:
 
 def dataset_summary_page():
     load_css()
+
     st.header('Dataset Summary', divider='violet')
 
     if 'df' in st.session_state and 'dataset_name' in st.session_state:

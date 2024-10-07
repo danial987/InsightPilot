@@ -246,3 +246,70 @@ a:hover {
   -webkit-box-align: center;
   align-items: center;
 }
+
+
+.st-emotion-cache-xtjyj5{
+  background-color: #9645ff;
+  color: white;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  padding: 6px 7px;
+  border-radius: 6px;
+  color: #333;
+  font-weight: 300;
+
+
+
+}
+
+.st-emotion-cache-1rtdyuf {
+  color: white;
+
+}
+
+
+
+.st-emotion-cache-qubd7b {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  padding: 6px 7px;
+  border-radius: 6px;
+  color: #333;
+  /* font-weight: 600; */
+  background-color: transparent; /* Remove individual backgrounds */
+
+ 
+
+}
+
+.st-emotion-cache-xtjyj5:hover, .st-emotion-cache-qubd7b:hover {
+  background-color: #9645ff; /* Hover background color */
+  color: white; /* White text on hover */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  padding: 6px 7px;
+  border-radius: 6px;
+  color: #333;
+  font-weight: 300;
+}
+
+.st-emotion-cache-6tkfeg:hover {
+  color: white;
+
+}
+
+
+
+
+.st-emotion-cache-1kyxreq {
+  margin-top: -415px;
+}
+
+.st-emotion-cache-79elbk {
+
+  margin-top: 45px;
+}
