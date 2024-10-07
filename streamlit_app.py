@@ -14,11 +14,11 @@ st.sidebar.image("static/logo.png", width=180)
 
 pages = [
     st.Page("pages/dataset_upload.py", title="Dataset Upload", icon="⬆️"),
-    st.Page("pages/search_dataset.py", title="Search Dataset", icon="🔍"),
     st.Page("pages/dataset_summary.py", title="Dataset Summary", icon="📊"),
     st.Page("pages/data_preprocessing.py", title="Data Preprocessing", icon="🔧"),
     st.Page("pages/data_visualization.py", title="Data Visualization", icon="📈"),
-    st.Page("pages/chatbot.py", title="Chatbot", icon="🤖")
+    st.Page("pages/chatbot.py", title="Chatbot", icon="🤖"),
+    st.Page("pages/search_dataset.py", title="Search Dataset", icon="🔍")
 ]
 
 pg = st.navigation(pages)

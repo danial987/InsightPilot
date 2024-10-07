@@ -1,4 +1,4 @@
-import io  # Ensure you import io to handle in-memory binary streams
+import io
 import pandas as pd
 import json
 from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData, LargeBinary, DateTime, Index
@@ -54,6 +54,15 @@ class Dataset:
         self.session.commit()
         print(f"Insert operation took {time.time() - start_time} seconds")
 
+    def save_to_database(self, file_name, file_format, file_size, data, user_id):
+        start_time = time.time()
+        self.session.execute(self.datasets.insert().values(
+            name=file_name, file_format=file_format, file_size=file_size, data=data, 
+            user_id=user_id, last_accessed=datetime.datetime.utcnow()))
+        self.session.commit()
+        print(f"Insert operation took {time.time() - start_time} seconds")
+
+
     @cached(cache)
     def fetch_datasets(self):
         start_time = time.time()
@@ -73,8 +82,6 @@ class Dataset:
         result = self.session.execute(self.datasets.select().where(self.datasets.c.id == dataset_id)).fetchone()
         print(f"Get operation took {time.time() - start_time} seconds")
         return result
-
-
    
     def update_last_accessed(self, dataset_id):
         start_time = time.time()
