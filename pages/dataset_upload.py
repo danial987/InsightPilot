@@ -200,51 +200,51 @@ def dataset_upload_page():
                                 index=st.session_state.rename_action_state.get(ds.id, 0)
                             )
 
-                            # if action == "View Summary":
-                            #     view_dataset_summary(ds.id)
-                            # elif action == "Preprocessing":
-                            #     dataset = dataset_db.get_dataset_by_id(ds.id) 
-                            #     st.session_state.df_to_preprocess = dataset.data 
-                            #     st.session_state.dataset_name_to_preprocess = dataset.name  
-                            #     st.session_state.dataset_id_to_preprocess = ds.id 
-                            #     st.switch_page("pages/data_preprocessing.py")
-
-                            # elif action == "Visualization":
-                            #     dataset = dataset_db.get_dataset_by_id(ds.id)  
-                            #     st.session_state.df_to_visualize = dataset.data 
-                            #     st.session_state.dataset_name_to_visualize = dataset.name 
-                            #     st.switch_page("pages/data_visualization.py") 
-
-                            # elif action == "Chat":
-                            #     dataset = dataset_db.get_dataset_by_id(ds.id)
-                            #     st.session_state.df_to_chat = dataset.data
-                            #     st.session_state.dataset_name_to_chat = dataset.name
-                            #     st.switch_page("pages/chatbot.py")
-
                             if action == "View Summary":
                                 view_dataset_summary(ds.id)
-                            
                             elif action == "Preprocessing":
-                                dataset = dataset_db.get_dataset_by_id(ds.id)
+                                dataset = dataset_db.get_dataset_by_id(ds.id) 
                                 st.session_state.df_to_preprocess = dataset.data 
                                 st.session_state.dataset_name_to_preprocess = dataset.name  
-                                st.session_state.dataset_id_to_preprocess = ds.id
-                                # Switch page using the page title, not the file path
-                                st.switch_page("data_preprocessing")
-                            
+                                st.session_state.dataset_id_to_preprocess = ds.id 
+                                st.switch_page("pages/data_preprocessing.py")
+
                             elif action == "Visualization":
-                                dataset = dataset_db.get_dataset_by_id(ds.id)
+                                dataset = dataset_db.get_dataset_by_id(ds.id)  
                                 st.session_state.df_to_visualize = dataset.data 
-                                st.session_state.dataset_name_to_visualize = dataset.name
-                                # Switch page using the page title, not the file path
-                                st.switch_page("data_visualization")
-                            
+                                st.session_state.dataset_name_to_visualize = dataset.name 
+                                st.switch_page("pages/data_visualization.py") 
+
                             elif action == "Chat":
                                 dataset = dataset_db.get_dataset_by_id(ds.id)
                                 st.session_state.df_to_chat = dataset.data
                                 st.session_state.dataset_name_to_chat = dataset.name
-                                # Switch page using the page title, not the file path
-                                st.switch_page("chatbot")
+                                st.switch_page("pages/chatbot.py")
+
+                            # if action == "View Summary":
+                            #     view_dataset_summary(ds.id)
+                            
+                            # elif action == "Preprocessing":
+                            #     dataset = dataset_db.get_dataset_by_id(ds.id)
+                            #     st.session_state.df_to_preprocess = dataset.data 
+                            #     st.session_state.dataset_name_to_preprocess = dataset.name  
+                            #     st.session_state.dataset_id_to_preprocess = ds.id
+                            #     # Switch page using the page title, not the file path
+                            #     st.switch_page("data_preprocessing")
+                            
+                            # elif action == "Visualization":
+                            #     dataset = dataset_db.get_dataset_by_id(ds.id)
+                            #     st.session_state.df_to_visualize = dataset.data 
+                            #     st.session_state.dataset_name_to_visualize = dataset.name
+                            #     # Switch page using the page title, not the file path
+                            #     st.switch_page("data_visualization")
+                            
+                            # elif action == "Chat":
+                            #     dataset = dataset_db.get_dataset_by_id(ds.id)
+                            #     st.session_state.df_to_chat = dataset.data
+                            #     st.session_state.dataset_name_to_chat = dataset.name
+                            #     # Switch page using the page title, not the file path
+                            #     st.switch_page("chatbot")
 
 
                             elif action == "Delete":

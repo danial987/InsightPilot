@@ -5,22 +5,10 @@ import uuid
 import io
 from pages.dataset_summary import DatasetSummary
 
-def load_custom_css():
-    custom_css = """
-    <style>
-    .st-emotion-cache-1eo1tir {
-        width: 100%;
-        padding: 6rem 1rem 1rem;
-        max-width: 60rem;
-    }
-
-    #MainMenu,
-    header {
-      visibility: hidden;
-    }
-    </style>
-    """
-    st.markdown(custom_css, unsafe_allow_html=True)
+def load_css():
+    with open('static/stylebot.css') as f:
+        css_code = f.read()
+    st.markdown(f'<style>{css_code}</style>', unsafe_allow_html=True)
 
 class Chatbot:
     def __init__(self):
@@ -204,7 +192,7 @@ class Chatbot:
         return None, None
 
     def run(self):
-        load_custom_css()
+        load_css()
 
         df, dataset_name = self.load_dataset()
 
