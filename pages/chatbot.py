@@ -1,219 +1,177 @@
 import streamlit as st
 import pandas as pd
-from transformers import pipeline
+import openai
 import uuid
 import io
-from pages.dataset_summary import DatasetSummary
+
+openai.api_key = '' 
+# add api key
 
 def load_css():
-    with open('static/stylebot.css') as f:
-        css_code = f.read()
-    st.markdown(f'<style>{css_code}</style>', unsafe_allow_html=True)
+    """Load custom CSS to style the chatbot interface."""
+    try:
+        with open('static/stylebot.css') as f:
+            css_code = f.read()
+        st.markdown(f'<style>{css_code}</style>', unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.error("CSS file not found! Make sure 'static/stylebot.css' exists.")
 
 class Chatbot:
     def __init__(self):
-        self.nlp = pipeline('text-generation', model='gpt2')
-        self.qa_model = pipeline('question-answering')
+        """Initialize the chatbot, setting up session state and chat history."""
+        self.initialize_session()
 
+    def initialize_session(self):
+        """Initialize session state variables."""
         if 'session_id' not in st.session_state:
-            st.session_state['session_id'] = str(uuid.uuid4()) 
+            st.session_state['session_id'] = str(uuid.uuid4())
 
         if 'chat_history' not in st.session_state:
             st.session_state['chat_history'] = []
 
-    def handle_specific_questions(self, df, question):
-        question_lower = question.lower()
-
-        if 'how many rows' in question_lower:
-            st.write(f"The dataset has {len(df)} rows.")
-            return None  
-    
-        if 'how many columns' in question_lower or 'number of features' in question_lower or 'number of columns' in question_lower:
-            st.write(f"The dataset has {len(df.columns)} columns.")
-            return None
-
-        if 'summary' in question_lower or 'describe' in question_lower:
-            st.write(self.generate_dataset_summary(df))
-            return None
-
-        if 'missing values' in question_lower:
-            missing_cells = df.isnull().sum().sum()
-            st.write(f"The dataset has {missing_cells} missing values.") if missing_cells else st.write("The dataset has no missing values.")
-            return None
-
-        if 'duplicate rows' in question_lower:
-            duplicate_rows = df.duplicated().sum()
-            st.write(f"The dataset has {duplicate_rows} duplicate rows.") if duplicate_rows else st.write("The dataset has no duplicate rows.")
-            return None
-
-        if 'numerical features' in question_lower or 'numerical analysis' in question_lower:
-            numerical_features = df.select_dtypes(include=[float, int]).columns.tolist()
-            if numerical_features:
-                st.write("Numerical Features:")
-                st.dataframe(df[numerical_features].describe())
-            else:
-                st.write("No numerical features available in the dataset.")
-            return None
-
-        if 'categorical features' in question_lower or 'categorical analysis' in question_lower:
-            categorical_features = df.select_dtypes(include=['object']).columns.tolist()
-            if categorical_features:
-                st.write("Categorical Features:")
-                st.dataframe(df[categorical_features].describe(include='all'))
-            else:
-                st.write("No categorical features available in the dataset.")
-            return None
-
-        if 'correlation matrix' in question_lower:
-            numerical_features = df.select_dtypes(include=[float, int])
-            if numerical_features.shape[1] > 1:
-                st.write("Correlation Matrix:")
-                st.dataframe(numerical_features.corr())
-            else:
-                st.write("Not enough numerical columns for a correlation matrix.")
-            return None
-
-        if 'distribution' in question_lower:
-            numerical_features = df.select_dtypes(include=[float, int])
-            if not numerical_features.empty:
-                st.write("Skewness:")
-                st.dataframe(numerical_features.apply(lambda x: x.skew()).to_frame('Skewness'))
-    
-                st.write("Kurtosis:")
-                st.dataframe(numerical_features.apply(lambda x: x.kurtosis()).to_frame('Kurtosis'))
-            else:
-                st.write("No numerical features available for distribution analysis.")
-            return None
-
-        if 'first rows' in question_lower or 'show first' in question_lower:
-            st.write("First rows of data:")
-            st.dataframe(df.head())
-            return None
-
-        if 'middle rows' in question_lower:
-            middle_idx = len(df) // 2
-            st.write("Middle rows of data:")
-            st.dataframe(df.iloc[middle_idx - 2:middle_idx + 3])
-            return None
-
-        if 'last rows' in question_lower or 'show last' in question_lower:
-            st.write("Last rows of data:")
-            st.dataframe(df.tail())
-            return None
-
-        if 'top' in question_lower and 'categories' in question_lower:
-            column_name = question_lower.split("in")[-1].strip().replace("[column_name]", "").strip()
-            if column_name in df.columns:
-                if pd.api.types.is_categorical_dtype(df[column_name]) or df[column_name].dtype == object:
-                    top_n = 5 
-                    top_categories = df[column_name].value_counts().head(top_n)
-                    st.write(f"Top {top_n} categories in '{column_name}':")
-                    st.table(top_categories)
-                    return None
-                else:
-                    st.write(f"'{column_name}' is not a categorical column.")
-                    return None
-            else:
-                st.write(f"Column '{column_name}' not found in the dataset.")
-                return None
-    
-        return None 
-
-    def generate_dataset_summary(self, df):
-        description = DatasetSummary.display_summary(df, st.session_state.get('dataset_name', 'Dataset'))
-        return description
-
-    def generate_numerical_features_analysis(self, df):
-        numerical_features = df.select_dtypes(include=[float, int]).columns.tolist()
-        if not numerical_features:
-            return "No numerical features available in the dataset."
-        
-        basic_stats = df[numerical_features].describe().to_string()
-        return f"Numerical Features Analysis:\n{basic_stats}"
-
-    def generate_categorical_features_analysis(self, df):
-        categorical_features = df.select_dtypes(include=['object']).columns.tolist()
-        if not categorical_features:
-            return "No categorical features available in the dataset."
-        
-        return f"Categorical Features:\n{', '.join(categorical_features)}"
-
-    def generate_correlation_matrix(self, df):
-        corr_matrix = df.corr().to_string()
-        return f"Correlation Matrix:\n{corr_matrix}"
-
-    def generate_distribution_analysis(self, df):
-        numerical_features = df.select_dtypes(include=[float, int]).columns.tolist()
-        skewness_info = {}
-        kurtosis_info = {}
-
-        for feature in numerical_features:
-            skewness_info[feature] = df[feature].skew()
-            kurtosis_info[feature] = df[feature].kurtosis()
-
-        skewness_str = "\n".join([f"- {feature}: {skewness:.2f}" for feature, skewness in skewness_info.items()])
-        kurtosis_str = "\n".join([f"- {feature}: {kurtosis:.2f}" for feature, kurtosis in kurtosis_info.items()])
-
-        return f"Skewness:\n{skewness_str}\n\nKurtosis:\n{kurtosis_str}"
-
-    def answer_dataset_question(self, df, user_question):
-        try:
-            specific_answer = self.handle_specific_questions(df, user_question)
-            if specific_answer:
-                return specific_answer
-
-            context = f"Columns: {', '.join(df.columns)}\nFirst rows:\n{df.head(5).to_string(index=False)}"
-            qa_input = {"question": user_question, "context": context}
-            result = self.qa_model(qa_input)
-
-            return result['answer']
-        except Exception as e:
-            return f"Error processing the dataset question: {str(e)}"
-
-    def answer_general_question(self, user_question):
-        try:
-            response = self.nlp(user_question, max_length=50, num_return_sequences=1)
-            return response[0]['generated_text']
-        except Exception as e:
-            return f"Error processing the general question: {str(e)}"
+    def reset_chat_history(self):
+        """Clear the chat history when switching datasets."""
+        st.session_state['chat_history'] = []
 
     def load_dataset(self):
+        """Load the dataset from session state, return the DataFrame and its name."""
         dataset_data = st.session_state.get('df_to_chat', None)
-        if dataset_data:
+        dataset_name = st.session_state.get('dataset_name_to_chat', None)
+
+        if dataset_data is None:
+            st.error("No dataset found in session state.")
+            return None, None
+
+        df = self.convert_dataset_to_dataframe(dataset_data)
+        return df, dataset_name
+
+    def convert_dataset_to_dataframe(self, dataset_data):
+        """Convert the dataset bytes into a pandas DataFrame."""
+        try:
             if isinstance(dataset_data, bytes):
                 try:
-                    df = pd.read_csv(io.BytesIO(dataset_data))
+                    return pd.read_csv(io.BytesIO(dataset_data))
                 except pd.errors.ParserError:
-                    df = pd.read_json(io.BytesIO(dataset_data))
+                    return pd.read_json(io.BytesIO(dataset_data))
             else:
-                df = dataset_data
+                return dataset_data
+        except Exception as e:
+            st.error(f"Failed to load dataset: {str(e)}")
+            return None
 
-            return df, st.session_state['dataset_name_to_chat']
-        return None, None
+    def call_openai(self, prompt, df):
+        """Generate detailed responses using OpenAI API with dataset context."""
+        full_prompt = self.build_openai_prompt(prompt, df)
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are an AI that helps answer questions related to datasets, providing detailed, elaborative explanations."},
+                    {"role": "user", "content": full_prompt}
+                ],
+                max_tokens=200,  
+                temperature=0.6 
+            )
+            return response['choices'][0]['message']['content'].strip()
+        except Exception as e:
+            return f"Error calling OpenAI API: {str(e)}"
+
+    def build_openai_prompt(self, user_prompt, df):
+        """Build the prompt for OpenAI by including detailed context from the dataset."""
+        dataset_summary = self.generate_dataset_summary(df)
+        full_prompt = f"{user_prompt}\n\nDataset Context:\n{dataset_summary}"
+        return full_prompt
+
+    def generate_dataset_summary(self, df):
+        """Generate a detailed summary of the dataset, including column details and basic statistics."""
+        try:
+            column_info = self.get_column_information(df)
+            missing_values_info = self.get_missing_values_info(df)
+            numeric_summary = self.get_numeric_summary(df)
+
+            dataset_summary = (
+                f"Columns in the dataset:\n{column_info}\n\n"
+                f"Missing values:\n{missing_values_info}\n\n"
+                f"Summary statistics for numeric columns:\n{numeric_summary}\n\n"
+                f"First 5 rows of the dataset:\n{df.head(5).to_string(index=False)}"
+            )
+            return dataset_summary
+        except Exception as e:
+            return f"Error generating dataset summary: {str(e)}"
+
+    def get_column_information(self, df):
+        """Get detailed information about dataset columns, including their types."""
+        column_info = []
+        for col in df.columns:
+            dtype = df[col].dtype
+            column_info.append(f"- {col}: {dtype}")
+        return "\n".join(column_info)
+
+    def get_missing_values_info(self, df):
+        """Check for missing values in the dataset."""
+        missing_info = df.isnull().sum()
+        if missing_info.sum() == 0:
+            return "No missing values in the dataset."
+        else:
+            missing_report = "\n".join([f"- {col}: {missing_info[col]} missing values" for col in df.columns if missing_info[col] > 0])
+            return missing_report
+
+    def get_numeric_summary(self, df):
+        """Generate summary statistics for numeric columns in the dataset."""
+        numeric_columns = df.select_dtypes(include=['float64', 'int64'])
+        if numeric_columns.empty:
+            return "No numeric columns found in the dataset."
+        else:
+            return numeric_columns.describe().to_string()
 
     def run(self):
+        """Run the chatbot, handling user input and generating responses."""
         load_css()
-
         df, dataset_name = self.load_dataset()
 
         if df is not None and dataset_name is not None:
-            st.title(f"Chat with your Dataset: {dataset_name} 🧠")
+            st.header(f"Chat with your Dataset: {dataset_name} 🧠", divider='violet')
 
             for chat in st.session_state['chat_history']:
                 st.chat_message(chat['role']).write(chat['message'])
-   
-            prompt = st.chat_input(f"Ask a question about {dataset_name}!")
-            if prompt:
-                st.session_state['chat_history'].append({'role': 'user', 'message': prompt})
-                st.chat_message('user').write(prompt)
 
-                response = self.answer_dataset_question(df, prompt)
+            user_input = st.chat_input(f"Ask a question about {dataset_name}!")
+            if user_input:
+                self.append_chat_history('user', user_input)
 
-                st.session_state['chat_history'].append({'role': 'assistant', 'message': response})
-                st.chat_message('assistant').write(response)
+                response = self.call_openai(user_input, df)
+
+                self.append_chat_history('assistant', response)
+
+            self.export_chat_history()
 
         else:
             st.error("No dataset selected. Please go back and select a dataset.")
+
+    def append_chat_history(self, role, message):
+        """Append the user or assistant message to the chat history."""
+        st.session_state['chat_history'].append({'role': role, 'message': message})
+        st.chat_message(role).write(message)
+
+    def export_chat_history(self):
+        """Allow the user to export the chat history as a text file."""
+        if st.session_state.get('chat_history'):
+            chat_history_text = self.format_chat_history()
+
+            st.download_button(
+                label="Download Chat History",
+                data=chat_history_text,
+                file_name="chat_history.txt",
+                mime="text/plain"
+            )
+
+    def format_chat_history(self):
+        """Format chat history as a readable text."""
+        formatted_history = []
+        for chat in st.session_state['chat_history']:
+            role = "User" if chat['role'] == 'user' else "Assistant"
+            formatted_history.append(f"{role}: {chat['message']}\n")
+        return "".join(formatted_history)
 
 chatbot = Chatbot()
 chatbot.run()

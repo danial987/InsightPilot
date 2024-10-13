@@ -217,8 +217,15 @@ def dataset_upload_page():
 
                             elif action == "Chat":
                                 dataset = dataset_db.get_dataset_by_id(ds.id)
+                                
+                                # Set the new dataset in session state
                                 st.session_state.df_to_chat = dataset.data
                                 st.session_state.dataset_name_to_chat = dataset.name
+                                
+                                # Clear the chat history when switching to a new dataset
+                                st.session_state['chat_history'] = []
+                            
+                                # Switch to the chatbot page
                                 st.switch_page("pages/chatbot.py")
 
                             # if action == "View Summary":

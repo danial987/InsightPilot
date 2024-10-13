@@ -9,7 +9,6 @@ from imblearn.under_sampling import RandomUnderSampler
 from imblearn.combine import SMOTEENN
 from database import Dataset
 
-
 class IPreprocessingStrategy:
     def apply(self, df: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError("Preprocessing strategies must implement the apply method.")
@@ -23,6 +22,36 @@ class PreprocessDataset:
 
     def apply_preprocessing(self, df: pd.DataFrame) -> pd.DataFrame:
         return self._strategy.apply(df)
+
+# Function to handle CSV loading and tokenization issues
+def load_data(data):
+    """
+    Tries to read the CSV data and handle tokenization errors.
+    """
+    try:
+        # Try reading the CSV with the default settings first
+        df = pd.read_csv(io.StringIO(data.decode('utf-8')))
+    except pd.errors.ParserError:
+        # If there's a tokenization error, try skipping the bad lines
+        st.warning("ParserError encountered. Skipping problematic lines.")
+        df = pd.read_csv(io.StringIO(data.decode('utf-8')), on_bad_lines='warn')
+    
+    # If the issue persists, try with other delimiters (like semicolon or tab)
+    if df.empty:
+        try:
+            st.warning("Trying to load the file using a semicolon delimiter...")
+            df = pd.read_csv(io.StringIO(data.decode('utf-8')), delimiter=';')
+        except pd.errors.ParserError:
+            st.error("Could not parse the file with semicolon as a delimiter.")
+    
+    if df.empty:
+        try:
+            st.warning("Trying to load the file using a tab delimiter...")
+            df = pd.read_csv(io.StringIO(data.decode('utf-8')), delimiter='\t')
+        except pd.errors.ParserError:
+            st.error("Could not parse the file with tab as a delimiter.")
+
+    return df
 
 class RemoveDuplicates(IPreprocessingStrategy):
     def apply(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -329,7 +358,74 @@ class OutlierHandling(IPreprocessingStrategy):
             show_outlier_handling_dialog()
 
         return df if 'df_preprocessed' not in st.session_state else st.session_state['df_preprocessed']
-   
+
+class DeleteFeatures(IPreprocessingStrategy):
+    def apply(self, df: pd.DataFrame) -> pd.DataFrame:
+        all_columns = df.columns.tolist()
+
+        if not all_columns:
+            st.warning("This dataset has no columns to delete.")
+            return df
+
+        @st.dialog("Delete Features")
+        def show_delete_features_dialog():
+            st.write("### Available Columns:")
+            st.write(all_columns)
+
+            # User selects the columns to delete
+            columns_to_delete = st.multiselect(
+                "Select features (columns) to delete from the dataset:",
+                options=all_columns,
+                help="Hold Ctrl or Cmd to select multiple columns."
+            )
+
+            # Only display the delete button if columns are selected
+            if columns_to_delete:
+                if st.button("Delete Selected Features"):
+                    # Create a copy of the dataframe and drop the selected columns
+                    df_cleaned = df.copy()
+                    df_cleaned.drop(columns=columns_to_delete, inplace=True)
+                    st.success(f"Features {columns_to_delete} have been deleted.")
+                    
+                    # Update the session state with the preprocessed data
+                    st.session_state['df_preprocessed'] = df_cleaned
+                    st.session_state['features_deleted'] = True
+                    st.session_state['show_before_after_button'] = True
+                    st.session_state['show_save_button'] = True
+                    st.session_state['show_delete_features_dialog'] = False
+            else:
+                st.warning("No columns selected for deletion.")
+
+        if 'show_delete_features_dialog' not in st.session_state:
+            st.session_state['show_delete_features_dialog'] = True
+
+        if st.session_state['show_delete_features_dialog']:
+            show_delete_features_dialog()
+
+        return df if 'df_preprocessed' not in st.session_state else st.session_state['df_preprocessed']
+
+
+# Memory Management Functions
+
+@staticmethod
+def calculate_memory_usage(df):
+    """Calculates the memory usage of the DataFrame."""
+    return df.memory_usage(deep=True).sum()
+
+@staticmethod
+def is_hashable(val):
+    """Checks if a value is hashable."""
+    try:
+        hash(val)
+    except TypeError:
+        return False
+    return True
+
+@staticmethod
+def make_hashable(df):
+    """Converts lists in DataFrame cells to tuples so they are hashable."""
+    return df.applymap(lambda x: tuple(x) if isinstance(x, list) else x)
+
 def load_css():
     with open('static/style.css') as f:
         css_code = f.read()
@@ -347,12 +443,40 @@ def reset_preprocessing_state():
         if key in st.session_state:
             del st.session_state[key]
 
+
+def load_data_with_logging(data):
+    """
+    Tries to read the CSV data and handle tokenization errors while logging the skipped lines.
+    """
+    skipped_lines = []
+    
+    try:
+        # Try reading the CSV with the default settings first
+        df = pd.read_csv(io.StringIO(data.decode('utf-8')))
+    except pd.errors.ParserError:
+        # If there's a tokenization error, try reading while logging the problematic lines
+        st.warning("ParserError encountered. Logging problematic lines and attempting to load the file.")
+        try:
+            # Log problematic lines and replace them with NaN
+            df = pd.read_csv(io.StringIO(data.decode('utf-8')), on_bad_lines=lambda x: skipped_lines.append(x))
+        except Exception as e:
+            st.error(f"Error encountered: {e}")
+            return pd.DataFrame()
+
+    # Log the problematic lines to the user
+    if skipped_lines:
+        st.warning(f"{len(skipped_lines)} problematic lines were skipped or replaced:")
+        for line in skipped_lines[:10]:  # Show only first 10 skipped lines
+            st.write(f"Skipped line: {line}")
+
+    return df
+
+
 def data_preprocessing_page():
     load_css()
     
     st.header('Data Preprocessing', divider='violet')
 
-    # Ensure session state is reset when a new dataset is selected
     if 'dataset_name_to_preprocess' in st.session_state:
         if 'previous_dataset' not in st.session_state or st.session_state['previous_dataset'] != st.session_state['dataset_name_to_preprocess']:
             reset_preprocessing_state()
@@ -360,24 +484,26 @@ def data_preprocessing_page():
 
     if 'df_to_preprocess' in st.session_state and 'dataset_name_to_preprocess' in st.session_state:
         data = st.session_state.df_to_preprocess
-        
-        # Decode bytes to DataFrame if necessary
+
         if isinstance(data, bytes):
-            df = pd.read_csv(io.StringIO(data.decode('utf-8')))
+            df = load_data_with_logging(data)
         else:
             df = data
 
-        # Store the original data copy for preprocessing
+        if df.empty:
+            st.error("Unable to load the dataset. Please check for formatting issues.")
+            return
+
+        df = make_hashable(df)
+
         if 'df_preprocessed' not in st.session_state:
             st.session_state['df_preprocessed'] = df.copy()
 
         dataset_name = st.session_state.dataset_name_to_preprocess
-        
-        # Display dataset name
+
         with st.container(border=True):
             st.write(f"Dataset: {dataset_name}")
 
-        # Preprocessing steps options
         with st.container(border=True):
             preprocess_options = [
                 "Remove Duplicates", 
@@ -385,7 +511,8 @@ def data_preprocessing_page():
                 "Scale Features", 
                 "Encode Data", 
                 "Handle Imbalanced Data", 
-                "Handle Outliers"
+                "Handle Outliers", 
+                "Delete Features"  # New feature engineering technique
             ]
             selected_preprocess = st.selectbox(
                 "Choose a preprocessing step", 
@@ -394,7 +521,7 @@ def data_preprocessing_page():
             )
             st.session_state['selected_preprocess'] = selected_preprocess
 
-        # Handle different preprocessing techniques
+        # Handle the selected preprocessing step
         if selected_preprocess == "Remove Duplicates":
             if st.session_state.get('duplicates_removed', False):
                 st.warning("No duplicates found. You've already removed duplicates.")
@@ -461,7 +588,19 @@ def data_preprocessing_page():
                     st.session_state['show_before_after_button'] = True
                     st.session_state['show_save_button'] = True
 
-        # Show Before and After button
+        # Add the new Delete Features option
+        elif selected_preprocess == "Delete Features":
+            if st.session_state.get('features_deleted', False):
+                st.warning("You've already deleted features.")
+            else:
+                preprocessing_context = PreprocessDataset(DeleteFeatures())
+                if st.button("Apply"):
+                    df_preprocessed = preprocessing_context.apply_preprocessing(st.session_state.df_preprocessed)
+                    st.session_state.df_preprocessed = df_preprocessed
+                    st.session_state['show_before_after_button'] = True
+                    st.session_state['show_save_button'] = True
+
+        # Show before and after comparison
         if st.session_state.get('show_before_after_button', False):
             with st.container(border=True):
                 if st.button("Show Before and After"):
@@ -473,30 +612,40 @@ def data_preprocessing_page():
                         st.write("### After Preprocessing")
                         st.dataframe(st.session_state.df_preprocessed)
 
-        # Show Save to Database and Visualization buttons in columns
+        # Save preprocessed dataset to database
         if st.session_state.get('show_save_button', False):
-            col1, col2 = st.columns([6,1])
-            
+            col1, col2 = st.columns([6, 1])
+        
             with col1:
                 if st.button("Save to Database"):
                     dataset_db = Dataset()
-                    base_name, extension = dataset_name.rsplit('.', 1)
-                    new_dataset_name = f"{base_name}_preprocessed.{extension}"
-                    dataset_db.save_to_database(
-                        new_dataset_name,
-                        'csv',
-                        len(st.session_state.df_preprocessed),
-                        st.session_state.df_preprocessed.to_csv(index=False).encode()
-                    )
-                    st.success(f"Preprocessed dataset saved as '{new_dataset_name}' in the database.")  
-                    
+
+                    if dataset_name:
+                        if '.' in dataset_name:
+                            base_name, extension = dataset_name.rsplit('.', 1)
+                        else:
+                            base_name, extension = dataset_name, 'csv'
+        
+                        new_dataset_name = f"{base_name}_preprocessed.{extension}"
+        
+                        dataset_db.save_to_database(
+                            new_dataset_name,
+                            'csv',
+                            len(st.session_state.df_preprocessed),
+                            st.session_state.df_preprocessed.to_csv(index=False).encode()
+                        )
+        
+                        st.success(f"Preprocessed dataset saved as '{new_dataset_name}' in the database.")
+                    else:
+                        st.error("Dataset name is missing. Cannot save.")
+
             with col2:
                 if st.button("Go to Visualization"):
-                    st.session_state.df_to_visualize = st.session_state.df_preprocessed  # Store preprocessed dataset for visualization
+                    st.session_state.df_to_visualize = st.session_state.df_preprocessed
                     st.session_state.dataset_name_to_visualize = st.session_state.dataset_name_to_preprocess
                     st.switch_page("pages/data_visualization.py")
 
     else:
-        st.warning("No dataset selected for preprocessing. Please ensure you're navigating from the appropriate page where dataset is uploaded or summarized.")
+        st.warning("No dataset selected for preprocessing. Please ensure you're navigating from the appropriate page where the dataset is uploaded or summarized.")
 
 data_preprocessing_page()

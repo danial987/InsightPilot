@@ -130,11 +130,10 @@ class DatasetSearch:
                             selected_format = st.selectbox(
                                 f"Select format for {ds['title']}",
                                 options=[fmt for fmt, url in ds['download_urls']],
-                                key=f"{ds['id']}_selectbox"  # Adding unique key for each selectbox
+                                key=f"{ds['id']}_selectbox" 
                             )
                             download_url = next(url for fmt, url in ds['download_urls'] if fmt == selected_format)
                             
-                            # Differentiate between JSON and other formats like CSV
                             if selected_format == "JSON":
                                 response = requests.get(download_url)
                                 if response.status_code == 200:

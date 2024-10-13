@@ -54,15 +54,6 @@ class Dataset:
         self.session.commit()
         print(f"Insert operation took {time.time() - start_time} seconds")
 
-    def save_to_database(self, file_name, file_format, file_size, data, user_id):
-        start_time = time.time()
-        self.session.execute(self.datasets.insert().values(
-            name=file_name, file_format=file_format, file_size=file_size, data=data, 
-            user_id=user_id, last_accessed=datetime.datetime.utcnow()))
-        self.session.commit()
-        print(f"Insert operation took {time.time() - start_time} seconds")
-
-
     @cached(cache)
     def fetch_datasets(self):
         start_time = time.time()

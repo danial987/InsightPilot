@@ -44,6 +44,48 @@ def generate_dataset_description(df):
     return description
 
 class DatasetSummary:
+
+    @staticmethod
+    def calculate_memory_usage(df):
+        """Calculates the memory usage of the DataFrame."""
+        return df.memory_usage(deep=True).sum()
+
+    @staticmethod
+    def is_hashable(val):
+        """Checks if a value is hashable."""
+        try:
+            hash(val)
+        except TypeError:
+            return False
+        return True
+
+    @staticmethod
+    def make_hashable(df):
+        """Converts lists in DataFrame cells to tuples so they are hashable."""
+        return df.applymap(lambda x: tuple(x) if isinstance(x, list) else x)
+
+    @staticmethod
+    def generate_dataset_description(df):
+        """Generates a descriptive summary of the dataset."""
+        num_variables = df.shape[1]
+        num_observations = df.shape[0]
+        numerical_features = df.select_dtypes(include=[np.number]).columns.tolist()
+        categorical_features = df.select_dtypes(include=['object']).columns.tolist()
+        missing_cells = df.isnull().sum().sum()
+
+        hashable_df = DatasetSummary.make_hashable(df)  # Calling the method from the class
+        duplicate_rows = hashable_df.duplicated().sum()
+
+        description = f"""
+        The dataset contains {num_variables} variables and {num_observations} observations.
+        There are {len(numerical_features)} numerical features and {len(categorical_features)} categorical features.
+        The dataset has {missing_cells} missing cells and {duplicate_rows} duplicate rows.
+        This dataset can be used for various data analysis and machine learning tasks, providing opportunities to explore and model the data in depth.
+        With its mix of numerical and categorical data, it allows for comprehensive statistical analyses and predictive modeling.
+        Additionally, handling missing data and duplicate rows can help improve data quality and model performance.
+        """
+        return description
+
     @staticmethod
     def display_summary(df, dataset_name):
         description = generate_dataset_description(df)
@@ -315,29 +357,63 @@ class DatasetSummary:
         with st.container(border=True):
             st.subheader("Data Overview")
 
-            tab1, tab2, tab3, tab4 = st.tabs(["Dataset Head", "Dataset Middle", "Dataset Footer", "Full DataFrame"])
+            tab1, tab2, tab3, tab4, tab5 = st.tabs([
+                "Dataset Head", 
+                "Dataset Middle", 
+                "Dataset Footer", 
+                "Full DataFrame", 
+                "Interactive Exploration"
+            ])
+    
             with tab1:
                 st.write("##### Dataset Head")
                 st.write(df.head())
+    
             with tab2:
                 st.write("##### Dataset Middle")
                 st.write(df.iloc[len(df)//2:len(df)//2+5])
+    
             with tab3:
                 st.write("##### Dataset Footer")
                 st.write(df.tail())
+    
             with tab4:
                 st.write("##### Full DataFrame")
                 st.dataframe(df)
+    
+            with tab5:
+                st.write("##### Interactive Dataset Exploration")
+                DatasetSummary.interactive_dataset_exploration(df)  # Call using the class
 
+    @staticmethod
+    def interactive_dataset_exploration(df):
+        """Allow users to explore the dataset interactively."""
+        if df is not None:
+            col1, col2 = st.columns([1, 1])
+            # Select a column to filter by
+            with col1:
+                column = st.selectbox("Select column to filter by", df.columns)
+                unique_values = df[column].unique()
+
+            with col2:
+                filter_value = st.selectbox(f"Filter {column} by", unique_values)
+                filtered_df = df[df[column] == filter_value]
+
+            st.dataframe(filtered_df)
+        else:
+            st.error("No dataset loaded for exploration.")
+
+# Streamlit page for displaying the dataset summary and interactive exploration
 def dataset_summary_page():
-    load_css()
-
+    load_css()  # Assuming this function is defined elsewhere
+    
     st.header('Dataset Summary', divider='violet')
 
     if 'df' in st.session_state and 'dataset_name' in st.session_state:
         df = st.session_state.df
         dataset_name = st.session_state.dataset_name
 
+        # Display the dataset summary using the DatasetSummary class
         DatasetSummary.display_summary(df, dataset_name)
 
         col1, col2 = st.columns([5.4, 1])
@@ -351,5 +427,6 @@ def dataset_summary_page():
                 st.session_state.dataset_name_to_preprocess = st.session_state.dataset_name 
                 st.session_state.dataset_id_to_preprocess = st.session_state.dataset_id
                 st.switch_page("pages/data_preprocessing.py")
-                
+
+# Call the page rendering function
 dataset_summary_page()
