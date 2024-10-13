@@ -8,6 +8,7 @@ from imblearn.over_sampling import SMOTE
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.combine import SMOTEENN
 from database import Dataset
+import json
 
 class IPreprocessingStrategy:
     def apply(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -23,33 +24,39 @@ class PreprocessDataset:
     def apply_preprocessing(self, df: pd.DataFrame) -> pd.DataFrame:
         return self._strategy.apply(df)
 
-# Function to handle CSV loading and tokenization issues
-def load_data(data):
+# Function to handle multiple file types (CSV, XLSX, JSON) with encoding and format support
+def load_data_with_logging(data, file_format: str):
     """
-    Tries to read the CSV data and handle tokenization errors.
+    Handles reading different file formats (CSV, XLSX, JSON) with proper error handling.
     """
+    skipped_lines = []
+    df = pd.DataFrame()  # Initialize an empty DataFrame as fallback
+
     try:
-        # Try reading the CSV with the default settings first
-        df = pd.read_csv(io.StringIO(data.decode('utf-8')))
-    except pd.errors.ParserError:
-        # If there's a tokenization error, try skipping the bad lines
-        st.warning("ParserError encountered. Skipping problematic lines.")
-        df = pd.read_csv(io.StringIO(data.decode('utf-8')), on_bad_lines='warn')
-    
-    # If the issue persists, try with other delimiters (like semicolon or tab)
-    if df.empty:
-        try:
-            st.warning("Trying to load the file using a semicolon delimiter...")
-            df = pd.read_csv(io.StringIO(data.decode('utf-8')), delimiter=';')
-        except pd.errors.ParserError:
-            st.error("Could not parse the file with semicolon as a delimiter.")
-    
-    if df.empty:
-        try:
-            st.warning("Trying to load the file using a tab delimiter...")
-            df = pd.read_csv(io.StringIO(data.decode('utf-8')), delimiter='\t')
-        except pd.errors.ParserError:
-            st.error("Could not parse the file with tab as a delimiter.")
+        if file_format == 'csv':
+            try:
+                # Attempt to read the CSV file with utf-8 encoding
+                df = pd.read_csv(io.BytesIO(data), encoding='utf-8')
+            except UnicodeDecodeError:
+                # If utf-8 fails, try ISO-8859-1 encoding
+                st.warning("UnicodeDecodeError encountered. Retrying with ISO-8859-1 encoding.")
+                df = pd.read_csv(io.BytesIO(data), encoding='ISO-8859-1')
+        elif file_format == 'xlsx':
+            # Read XLSX file using openpyxl
+            df = pd.read_excel(io.BytesIO(data), engine='openpyxl')
+        elif file_format == 'json':
+            # Handle JSON by parsing line-by-line (to avoid large JSON object issues)
+            try:
+                json_data = [json.loads(line) for line in data.decode('utf-8').splitlines() if line.strip()]
+                df = pd.json_normalize(json_data)
+            except json.JSONDecodeError as e:
+                st.error(f"Error decoding JSON: {e}")
+                return pd.DataFrame()
+        else:
+            st.error("Unsupported file format.")
+    except pd.errors.ParserError as e:
+        st.error(f"Error parsing the file: {e}")
+        return pd.DataFrame()
 
     return df
 
@@ -404,7 +411,6 @@ class DeleteFeatures(IPreprocessingStrategy):
 
         return df if 'df_preprocessed' not in st.session_state else st.session_state['df_preprocessed']
 
-
 # Memory Management Functions
 
 @staticmethod
@@ -443,35 +449,6 @@ def reset_preprocessing_state():
         if key in st.session_state:
             del st.session_state[key]
 
-
-def load_data_with_logging(data):
-    """
-    Tries to read the CSV data and handle tokenization errors while logging the skipped lines.
-    """
-    skipped_lines = []
-    
-    try:
-        # Try reading the CSV with the default settings first
-        df = pd.read_csv(io.StringIO(data.decode('utf-8')))
-    except pd.errors.ParserError:
-        # If there's a tokenization error, try reading while logging the problematic lines
-        st.warning("ParserError encountered. Logging problematic lines and attempting to load the file.")
-        try:
-            # Log problematic lines and replace them with NaN
-            df = pd.read_csv(io.StringIO(data.decode('utf-8')), on_bad_lines=lambda x: skipped_lines.append(x))
-        except Exception as e:
-            st.error(f"Error encountered: {e}")
-            return pd.DataFrame()
-
-    # Log the problematic lines to the user
-    if skipped_lines:
-        st.warning(f"{len(skipped_lines)} problematic lines were skipped or replaced:")
-        for line in skipped_lines[:10]:  # Show only first 10 skipped lines
-            st.write(f"Skipped line: {line}")
-
-    return df
-
-
 def data_preprocessing_page():
     load_css()
     
@@ -486,7 +463,7 @@ def data_preprocessing_page():
         data = st.session_state.df_to_preprocess
 
         if isinstance(data, bytes):
-            df = load_data_with_logging(data)
+            df = load_data_with_logging(data, file_format=st.session_state.dataset_name_to_preprocess.split('.')[-1])
         else:
             df = data
 
@@ -512,7 +489,7 @@ def data_preprocessing_page():
                 "Encode Data", 
                 "Handle Imbalanced Data", 
                 "Handle Outliers", 
-                "Delete Features"  # New feature engineering technique
+                "Delete Features"
             ]
             selected_preprocess = st.selectbox(
                 "Choose a preprocessing step", 
@@ -588,7 +565,6 @@ def data_preprocessing_page():
                     st.session_state['show_before_after_button'] = True
                     st.session_state['show_save_button'] = True
 
-        # Add the new Delete Features option
         elif selected_preprocess == "Delete Features":
             if st.session_state.get('features_deleted', False):
                 st.warning("You've already deleted features.")
