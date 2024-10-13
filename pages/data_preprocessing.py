@@ -24,28 +24,23 @@ class PreprocessDataset:
     def apply_preprocessing(self, df: pd.DataFrame) -> pd.DataFrame:
         return self._strategy.apply(df)
 
-# Function to handle multiple file types (CSV, XLSX, JSON) with encoding and format support
 def load_data_with_logging(data, file_format: str):
     """
     Handles reading different file formats (CSV, XLSX, JSON) with proper error handling.
     """
     skipped_lines = []
-    df = pd.DataFrame()  # Initialize an empty DataFrame as fallback
+    df = pd.DataFrame()  
 
     try:
         if file_format == 'csv':
             try:
-                # Attempt to read the CSV file with utf-8 encoding
                 df = pd.read_csv(io.BytesIO(data), encoding='utf-8')
             except UnicodeDecodeError:
-                # If utf-8 fails, try ISO-8859-1 encoding
                 st.warning("UnicodeDecodeError encountered. Retrying with ISO-8859-1 encoding.")
                 df = pd.read_csv(io.BytesIO(data), encoding='ISO-8859-1')
         elif file_format == 'xlsx':
-            # Read XLSX file using openpyxl
             df = pd.read_excel(io.BytesIO(data), engine='openpyxl')
         elif file_format == 'json':
-            # Handle JSON by parsing line-by-line (to avoid large JSON object issues)
             try:
                 json_data = [json.loads(line) for line in data.decode('utf-8').splitlines() if line.strip()]
                 df = pd.json_normalize(json_data)
@@ -379,22 +374,18 @@ class DeleteFeatures(IPreprocessingStrategy):
             st.write("### Available Columns:")
             st.write(all_columns)
 
-            # User selects the columns to delete
             columns_to_delete = st.multiselect(
                 "Select features (columns) to delete from the dataset:",
                 options=all_columns,
                 help="Hold Ctrl or Cmd to select multiple columns."
             )
 
-            # Only display the delete button if columns are selected
             if columns_to_delete:
                 if st.button("Delete Selected Features"):
-                    # Create a copy of the dataframe and drop the selected columns
                     df_cleaned = df.copy()
                     df_cleaned.drop(columns=columns_to_delete, inplace=True)
                     st.success(f"Features {columns_to_delete} have been deleted.")
-                    
-                    # Update the session state with the preprocessed data
+ 
                     st.session_state['df_preprocessed'] = df_cleaned
                     st.session_state['features_deleted'] = True
                     st.session_state['show_before_after_button'] = True
@@ -410,8 +401,6 @@ class DeleteFeatures(IPreprocessingStrategy):
             show_delete_features_dialog()
 
         return df if 'df_preprocessed' not in st.session_state else st.session_state['df_preprocessed']
-
-# Memory Management Functions
 
 @staticmethod
 def calculate_memory_usage(df):
@@ -498,7 +487,6 @@ def data_preprocessing_page():
             )
             st.session_state['selected_preprocess'] = selected_preprocess
 
-        # Handle the selected preprocessing step
         if selected_preprocess == "Remove Duplicates":
             if st.session_state.get('duplicates_removed', False):
                 st.warning("No duplicates found. You've already removed duplicates.")
@@ -576,7 +564,6 @@ def data_preprocessing_page():
                     st.session_state['show_before_after_button'] = True
                     st.session_state['show_save_button'] = True
 
-        # Show before and after comparison
         if st.session_state.get('show_before_after_button', False):
             with st.container(border=True):
                 if st.button("Show Before and After"):
@@ -588,7 +575,6 @@ def data_preprocessing_page():
                         st.write("### After Preprocessing")
                         st.dataframe(st.session_state.df_preprocessed)
 
-        # Save preprocessed dataset to database
         if st.session_state.get('show_save_button', False):
             col1, col2 = st.columns([6, 1])
         

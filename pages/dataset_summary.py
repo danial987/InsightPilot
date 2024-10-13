@@ -3,45 +3,12 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-
+import ast
 
 def load_css():
     with open('static/style.css') as f:
         css_code = f.read()
     st.markdown(f'<style>{css_code}</style>', unsafe_allow_html=True)
-
-def calculate_memory_usage(df):
-    return df.memory_usage(deep=True).sum()
-
-def is_hashable(val):
-    try:
-        hash(val)
-    except TypeError:
-        return False
-    return True
-
-def make_hashable(df):
-    return df.applymap(lambda x: tuple(x) if isinstance(x, list) else x)
-
-def generate_dataset_description(df):
-    num_variables = df.shape[1]
-    num_observations = df.shape[0]
-    numerical_features = df.select_dtypes(include=[np.number]).columns.tolist()
-    categorical_features = df.select_dtypes(include=['object']).columns.tolist()
-    missing_cells = df.isnull().sum().sum()
-    
-    hashable_df = make_hashable(df)
-    duplicate_rows = hashable_df.duplicated().sum()
-
-    description = f"""
-    The dataset contains {num_variables} variables and {num_observations} observations.
-    There are {len(numerical_features)} numerical features and {len(categorical_features)} categorical features.
-    The dataset has {missing_cells} missing cells and {duplicate_rows} duplicate rows.
-    This dataset can be used for various data analysis and machine learning tasks, providing opportunities to explore and model the data in depth.
-    With its mix of numerical and categorical data, it allows for comprehensive statistical analyses and predictive modeling.
-    Additionally, handling missing data and duplicate rows can help improve data quality and model performance.
-    """
-    return description
 
 class DatasetSummary:
 
@@ -61,8 +28,15 @@ class DatasetSummary:
 
     @staticmethod
     def make_hashable(df):
-        """Converts lists in DataFrame cells to tuples so they are hashable."""
-        return df.applymap(lambda x: tuple(x) if isinstance(x, list) else x)
+        """Converts lists and dicts in DataFrame cells to tuples so they are hashable."""
+        def convert_to_hashable(val):
+            if isinstance(val, list):
+                return tuple(val)
+            elif isinstance(val, dict):
+                return tuple(sorted(val.items()))
+            return val
+
+        return df.applymap(convert_to_hashable)
 
     @staticmethod
     def generate_dataset_description(df):
@@ -73,7 +47,7 @@ class DatasetSummary:
         categorical_features = df.select_dtypes(include=['object']).columns.tolist()
         missing_cells = df.isnull().sum().sum()
 
-        hashable_df = DatasetSummary.make_hashable(df)  # Calling the method from the class
+        hashable_df = DatasetSummary.make_hashable(df)
         duplicate_rows = hashable_df.duplicated().sum()
 
         description = f"""
@@ -88,7 +62,7 @@ class DatasetSummary:
 
     @staticmethod
     def display_summary(df, dataset_name):
-        description = generate_dataset_description(df)
+        description = DatasetSummary.generate_dataset_description(df)
 
         with st.expander("Dataset"):
             st.write(f"### Dataset: {dataset_name}")
@@ -101,7 +75,7 @@ class DatasetSummary:
         for col in df.columns:
             if df[col].isnull().sum() > 0:
                 warnings.append((col, f"{df[col].isnull().sum()} ({(df[col].isnull().sum() / df.shape[0]) * 100:.1f}%) missing values", "missing"))
-            if is_hashable(df[col].iloc[0]) and df[col].nunique() / df.shape[0] > 0.5:
+            if DatasetSummary.is_hashable(df[col].iloc[0]) and df[col].nunique() / df.shape[0] > 0.5:
                 warnings.append((col, f"high cardinality: {df[col].nunique()} distinct values", "warning"))
             if df[col].dtype in [np.number] and df[col].skew() > 1:
                 warnings.append((col, f"highly skewed (γ1 = {df[col].skew():.2f})", "skewed"))
@@ -117,9 +91,9 @@ class DatasetSummary:
                 num_variables = df.shape[1]
                 num_observations = df.shape[0]
                 missing_cells = df.isnull().sum().sum()
-                hashable_df = make_hashable(df)
+                hashable_df = DatasetSummary.make_hashable(df)
                 duplicate_rows = hashable_df[hashable_df.duplicated()].shape[0]
-                total_size = calculate_memory_usage(df)
+                total_size = DatasetSummary.calculate_memory_usage(df)
                 avg_record_size = total_size / num_observations
 
                 row1_col1, row1_col2 = st.columns(2)
@@ -383,14 +357,14 @@ class DatasetSummary:
     
             with tab5:
                 st.write("##### Interactive Dataset Exploration")
-                DatasetSummary.interactive_dataset_exploration(df)  # Call using the class
+                DatasetSummary.interactive_dataset_exploration(df)
 
     @staticmethod
     def interactive_dataset_exploration(df):
         """Allow users to explore the dataset interactively."""
         if df is not None:
             col1, col2 = st.columns([1, 1])
-            # Select a column to filter by
+
             with col1:
                 column = st.selectbox("Select column to filter by", df.columns)
                 unique_values = df[column].unique()
@@ -403,9 +377,8 @@ class DatasetSummary:
         else:
             st.error("No dataset loaded for exploration.")
 
-# Streamlit page for displaying the dataset summary and interactive exploration
 def dataset_summary_page():
-    load_css()  # Assuming this function is defined elsewhere
+    load_css()  
     
     st.header('Dataset Summary', divider='violet')
 
@@ -413,7 +386,6 @@ def dataset_summary_page():
         df = st.session_state.df
         dataset_name = st.session_state.dataset_name
 
-        # Display the dataset summary using the DatasetSummary class
         DatasetSummary.display_summary(df, dataset_name)
 
         col1, col2 = st.columns([5.4, 1])
@@ -428,5 +400,4 @@ def dataset_summary_page():
                 st.session_state.dataset_id_to_preprocess = st.session_state.dataset_id
                 st.switch_page("pages/data_preprocessing.py")
 
-# Call the page rendering function
 dataset_summary_page()
