@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
-import ast
+import io
+from database import Dataset  # Import the Dataset class from database.py
 
 def load_css():
     with open('static/style.css') as f:
@@ -11,6 +11,40 @@ def load_css():
     st.markdown(f'<style>{css_code}</style>', unsafe_allow_html=True)
 
 class DatasetSummary:
+    def __init__(self, dataset_id):
+        """Initialize DatasetSummary with a Dataset instance, loading dataset by ID."""
+        self.dataset_db = Dataset()  # Composition: DatasetSummary owns a Dataset instance
+        self.dataset_id = dataset_id
+        self.dataset = self.load_dataset()  # Load dataset by ID
+
+    def load_dataset(self):
+        """Load dataset from the database by dataset ID and convert it to a pandas DataFrame."""
+        if 'user_id' not in st.session_state:
+            st.error("User not logged in. Please log in to view datasets.")
+            return None
+        
+        user_id = st.session_state['user_id']  # Get user ID from session state
+        dataset_record = self.dataset_db.get_dataset_by_id(self.dataset_id, user_id)  # Pass user_id
+        if dataset_record:
+            dataset_data = dataset_record.data
+            file_format = dataset_record.file_format
+            if file_format == 'csv':
+                return Dataset.try_parsing_csv(io.BytesIO(dataset_data))
+            elif file_format == 'json':
+                return Dataset.try_parsing_json(io.BytesIO(dataset_data))
+            else:
+                st.error("Unsupported file format.")
+        else:
+            st.error(f"Dataset with ID {self.dataset_id} not found.")
+            return None
+
+    def update_last_accessed(self):
+        """Update the last accessed timestamp for the current dataset."""
+        if 'user_id' not in st.session_state:
+            st.error("User not logged in. Please log in to update datasets.")
+            return
+        user_id = st.session_state['user_id']
+        self.dataset_db.update_last_accessed(self.dataset_id, user_id)
 
     @staticmethod
     def calculate_memory_usage(df):
@@ -38,8 +72,7 @@ class DatasetSummary:
 
         return df.applymap(convert_to_hashable)
 
-    @staticmethod
-    def generate_dataset_description(df):
+    def generate_dataset_description(self, df):
         """Generates a descriptive summary of the dataset."""
         num_variables = df.shape[1]
         num_observations = df.shape[0]
@@ -54,18 +87,20 @@ class DatasetSummary:
         The dataset contains {num_variables} variables and {num_observations} observations.
         There are {len(numerical_features)} numerical features and {len(categorical_features)} categorical features.
         The dataset has {missing_cells} missing cells and {duplicate_rows} duplicate rows.
-        This dataset can be used for various data analysis and machine learning tasks, providing opportunities to explore and model the data in depth.
-        With its mix of numerical and categorical data, it allows for comprehensive statistical analyses and predictive modeling.
-        Additionally, handling missing data and duplicate rows can help improve data quality and model performance.
         """
         return description
 
-    @staticmethod
-    def display_summary(df, dataset_name):
-        description = DatasetSummary.generate_dataset_description(df)
+    def display_summary(self):
+        """Display the summary of the dataset."""
+        df = self.dataset
+        if df is None:
+            st.error("No dataset to display summary.")
+            return
+        
+        description = self.generate_dataset_description(df)
 
         with st.expander("Dataset"):
-            st.write(f"### Dataset: {dataset_name}")
+            st.write(f"### Dataset Summary")
             st.write(description)
 
         categorical_features = df.select_dtypes(include=['object']).columns.tolist()
@@ -184,7 +219,7 @@ class DatasetSummary:
                     st.write("##### Unique Values")
                     unique_tab1, unique_tab2 = st.tabs(["Table", "Visualization"])
                     with unique_tab1:
-                        unique_values = df[numerical_features].applymap(lambda x: str(x) if not is_hashable(x) else x).nunique().reset_index()
+                        unique_values = df[numerical_features].applymap(lambda x: str(x) if not DatasetSummary.is_hashable(x) else x).nunique().reset_index()
                         unique_values.columns = ['Feature', 'Unique Values']
                         st.write(unique_values)
                     with unique_tab2:
@@ -288,7 +323,7 @@ class DatasetSummary:
                     st.write("##### Unique Values")
                     unique_tab1, unique_tab2 = st.tabs(["Table", "Visualization"])
                     with unique_tab1:
-                        unique_values = df[categorical_features].applymap(lambda x: str(x) if not is_hashable(x) else x).nunique().reset_index()
+                        unique_values = df[categorical_features].applymap(lambda x: str(x) if not DatasetSummary.is_hashable(x) else x).nunique().reset_index()
                         unique_values.columns = ['Feature', 'Unique Values']
                         st.write(unique_values)
                     with unique_tab2:
@@ -377,16 +412,18 @@ class DatasetSummary:
         else:
             st.error("No dataset loaded for exploration.")
 
+
 def dataset_summary_page():
-    load_css()  
-    
+    load_css()
+
     st.header('Dataset Summary', divider='violet')
 
-    if 'df' in st.session_state and 'dataset_name' in st.session_state:
-        df = st.session_state.df
-        dataset_name = st.session_state.dataset_name
+    # Use dataset ID from session state to initialize DatasetSummary
+    if 'dataset_id' in st.session_state:
+        dataset_id = st.session_state['dataset_id']
+        summary = DatasetSummary(dataset_id)
 
-        DatasetSummary.display_summary(df, dataset_name)
+        summary.display_summary()
 
         col1, col2 = st.columns([5.4, 1])
         with col1:
@@ -395,9 +432,9 @@ def dataset_summary_page():
                 st.switch_page("pages/dataset_upload.py")
         with col2:
             if st.button("Go to Preprocessing", key="go_to_preprocessing"):
-                st.session_state.df_to_preprocess = st.session_state.df  
-                st.session_state.dataset_name_to_preprocess = st.session_state.dataset_name 
-                st.session_state.dataset_id_to_preprocess = st.session_state.dataset_id
+                st.session_state.df_to_preprocess = summary.dataset
                 st.switch_page("pages/data_preprocessing.py")
+    else:
+        st.error("No dataset selected. Please go back and select a dataset.")
 
 dataset_summary_page()

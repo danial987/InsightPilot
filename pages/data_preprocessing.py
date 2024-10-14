@@ -575,31 +575,65 @@ def data_preprocessing_page():
                         st.write("### After Preprocessing")
                         st.dataframe(st.session_state.df_preprocessed)
 
+        # if st.session_state.get('show_save_button', False):
+        #     col1, col2 = st.columns([6, 1])
+        
+        #     with col1:
+                # if st.button("Save to Database"):
+                #     dataset_db = Dataset()
+
+                #     if dataset_name:
+                #         if '.' in dataset_name:
+                #             base_name, extension = dataset_name.rsplit('.', 1)
+                #         else:
+                #             base_name, extension = dataset_name, 'csv'
+        
+                #         new_dataset_name = f"{base_name}_preprocessed.{extension}"
+        
+                #         dataset_db.save_to_database(
+                #             new_dataset_name,
+                #             'csv',
+                #             len(st.session_state.df_preprocessed),
+                #             st.session_state.df_preprocessed.to_csv(index=False).encode(),
+                #             user_id=user_id
+                #         )
+        
+                #         st.success(f"Preprocessed dataset saved as '{new_dataset_name}' in the database.")
+                #     else:
+                #         st.error("Dataset name is missing. Cannot save.")
+
         if st.session_state.get('show_save_button', False):
             col1, col2 = st.columns([6, 1])
         
             with col1:
                 if st.button("Save to Database"):
                     dataset_db = Dataset()
-
-                    if dataset_name:
-                        if '.' in dataset_name:
-                            base_name, extension = dataset_name.rsplit('.', 1)
-                        else:
-                            base_name, extension = dataset_name, 'csv'
         
-                        new_dataset_name = f"{base_name}_preprocessed.{extension}"
-        
-                        dataset_db.save_to_database(
-                            new_dataset_name,
-                            'csv',
-                            len(st.session_state.df_preprocessed),
-                            st.session_state.df_preprocessed.to_csv(index=False).encode()
-                        )
-        
-                        st.success(f"Preprocessed dataset saved as '{new_dataset_name}' in the database.")
+                    if 'user_id' not in st.session_state:
+                        st.error("User not logged in. Please log in to save datasets.")
                     else:
-                        st.error("Dataset name is missing. Cannot save.")
+                        user_id = st.session_state['user_id']  # Retrieve the user_id from session state
+        
+                        if dataset_name:
+                            if '.' in dataset_name:
+                                base_name, extension = dataset_name.rsplit('.', 1)
+                            else:
+                                base_name, extension = dataset_name, 'csv'
+        
+                            new_dataset_name = f"{base_name}_preprocessed.{extension}"
+        
+                            # Save the dataset with user_id
+                            dataset_db.save_to_database(
+                                new_dataset_name,
+                                'csv',
+                                len(st.session_state.df_preprocessed),
+                                st.session_state.df_preprocessed.to_csv(index=False).encode(),
+                                user_id=user_id  # Pass the user_id to save to the correct user
+                            )
+        
+                            st.success(f"Preprocessed dataset saved as '{new_dataset_name}' in the database.")
+                        else:
+                            st.error("Dataset name is missing. Cannot save.")
 
             with col2:
                 if st.button("Go to Visualization"):
