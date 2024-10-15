@@ -1,0 +1,940 @@
+dataset_upload.py
+import streamlit as st
+import pandas as pd
+import io
+import datetime
+import json
+from database import Dataset
+
+class DatasetUploadManager:
+    def __init__(self):
+        self.dataset_db = Dataset()
+
+    def load_css(self):
+        with open('static/style.css') as f:
+            css_code = f.read()
+        st.markdown(f'<style>{css_code}</style>', unsafe_allow_html=True)
+
+    def categorize_by_time(self, datasets):
+        today = datetime.datetime.now().date()
+        yesterday = today - datetime.timedelta(days=1)
+        last_7_days = today - datetime.timedelta(days=7)
+        last_30_days = today - datetime.timedelta(days=30)
+
+        categorized = {
+            "Today": [],
+            "Yesterday": [],
+            "Previous 7 days": [],
+            "Previous 30 days": [],
+            "Older": []
+        }
+
+        for ds in datasets:
+            last_accessed_date = ds.last_accessed.date()
+            if last_accessed_date == today:
+                categorized["Today"].append(ds)
+            elif last_accessed_date == yesterday:
+                categorized["Yesterday"].append(ds)
+            elif last_accessed_date > last_7_days:
+                categorized["Previous 7 days"].append(ds)
+            elif last_accessed_date > last_30_days:
+                categorized["Previous 30 days"].append(ds)
+            else:
+                categorized["Older"].append(ds)
+
+        return categorized
+
+    def format_file_size(self, file_size_bytes):
+        """Helper function to display file size in KB or MB"""
+        if file_size_bytes < 1024 * 1024:
+            return f"{round(file_size_bytes / 1024, 2)} KB"
+        else:
+            return f"{round(file_size_bytes / (1024 * 1024), 2)} MB"
+
+    def dataset_upload_page(self):
+        self.load_css()
+        st.header('Upload your dataset', divider='violet')
+
+        # Check if the user is authenticated and their user_id exists
+        if 'user_id' not in st.session_state or not st.session_state['user_id']:
+            st.error("Please log in to upload and view your datasets.")
+            return
+
+        user_id = st.session_state['user_id']  # Get the logged-in user's ID
+
+        if 'uploaded' not in st.session_state:
+            st.session_state.uploaded = False
+        if 'show_summary_button' not in st.session_state:
+            st.session_state.show_summary_button = False
+        if 'rename_action_state' not in st.session_state:
+            st.session_state.rename_action_state = {}
+
+        with st.container(border=True):
+            uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx", "json"], key="uploaded_file")
+
+            if uploaded_file is not None:
+                file_name = uploaded_file.name
+                file_format = file_name.split('.')[-1]
+                file_size = uploaded_file.size
+                data = uploaded_file.getvalue()
+
+                # Check if the dataset already exists for the user
+                if self.dataset_db.dataset_exists(file_name, user_id):  # Pass user_id to check ownership
+                    st.warning("Dataset with this name already exists.")
+                else:
+                    try:
+                        with st.spinner("Loading..."):
+                            # progress_text = st.empty()
+                            # progress_bar = st.progress(0)
+                            # for percent_complete in range(0, 101, 10):
+                            #     progress_bar.progress(percent_complete)
+                            #     progress_text.text(f"{percent_complete}%")
+
+                            # Handle different file formats
+                            if file_format == 'csv':
+                                df = Dataset.try_parsing_csv(io.BytesIO(data))
+                                if df is None:
+                                    st.error("Failed to parse the CSV file. Please check the file format.")
+                                    return
+                            elif file_format == 'xlsx':
+                                import openpyxl
+                                df = pd.read_excel(io.BytesIO(data), engine='openpyxl')
+                            elif file_format == 'json':
+                                df = Dataset.try_parsing_json(uploaded_file)
+                                if df is None:
+                                    st.error("Failed to parse the JSON file. Please check the file format.")
+                                    return
+                            else:
+                                st.error("Unsupported file type")
+                                return
+
+                            # Handle empty dataset
+                            if df.empty or df.columns.empty:
+                                st.warning("The uploaded file is empty or does not contain any columns.")
+                                return
+
+                            # Save the dataset to the database with user_id
+                            st.session_state.df = df
+                            st.session_state.dataset_name = file_name
+                            self.dataset_db.save_to_database(file_name, file_format, file_size, data, user_id)  # Pass user_id to save
+                            st.success("Dataset uploaded successfully!")
+                            st.session_state.uploaded = True
+                            st.session_state.show_summary_button = True
+                            # progress_text.text("")
+                            # progress_bar.empty()
+
+                    except pd.errors.ParserError as e:
+                        st.error(f"Error parsing the file: {e}")
+                        return
+                    except json.JSONDecodeError as e:
+                        st.error(f"Error decoding JSON: {e}")
+                        return
+                    except Exception as e:
+                        st.error(f"Error reading the file: {e}")
+                        return
+
+
+        # Fetch datasets for the logged-in user
+        datasets_list = self.dataset_db.fetch_datasets(user_id)  # Pass the user_id to fetch datasets
+
+        if datasets_list:
+            with st.container(border=True):
+                st.write("### Recently Uploaded Datasets")
+                search_query = st.text_input("Search Datasets", placeholder="Search...", help="Enter keywords to search for datasets")
+
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    filter_format = st.selectbox("Filter by Format", ["All", "csv", "xlsx", "json"])
+                with col2:
+                    max_size = st.slider("Filter by Max Size (MB)", 0, 200, 200)
+                with col3:
+                    filter_date = st.date_input("Filter by Date", value=(datetime.date(2024, 1, 1), datetime.date.today()), key="date_filter")
+
+            # Filter datasets based on user search and filters
+            with st.container(border=True):
+                st.write('<div class="recent-files">', unsafe_allow_html=True)
+                col1, col2, col3, col4, col5 = st.columns([7, 3, 3, 4, 3])
+                with col1:
+                    st.write("**Name**")
+                with col2:
+                    st.write("**Format**")
+                with col3:
+                    st.write("**Size**")
+                with col4:
+                    st.write("**Last Accessed**")
+                with col5:
+                    st.write("**Action**")
+                st.write('</div>', unsafe_allow_html=True)
+
+                if isinstance(filter_date, tuple) and len(filter_date) == 2:
+                    start_date, end_date = filter_date
+                else:
+                    start_date, end_date = datetime.date(2024, 1, 1), datetime.date.today()
+
+                # Filter datasets based on criteria
+                filtered_datasets = [
+                    ds for ds in datasets_list
+                    if search_query.lower() in ds.name.lower() and
+                    (filter_format == "All" or ds.file_format == filter_format) and
+                    (ds.file_size <= max_size * 1024 * 1024) and
+                    (start_date <= ds.last_accessed.date() <= end_date)
+                ]
+
+                filtered_datasets.sort(key=lambda x: x.last_accessed, reverse=True)
+
+                categorized_datasets = self.categorize_by_time(filtered_datasets)
+
+                # Display datasets categorized by time
+                for category, datasets in categorized_datasets.items():
+                    if datasets:
+                        st.write(f"##### {category}")
+                        for ds in datasets:
+                            st.write('<div class="recent-file-item">', unsafe_allow_html=True)
+                            col2, col3, col4, col5, col6 = st.columns([6, 3, 3, 4, 3])
+
+                            with col2:
+                                dataset_name = ds.name.split('.')[0]
+                                st.write(f"{dataset_name}")
+                            with col3:
+                                st.write(f"{ds.file_format.upper()}")
+                            with col4:
+                                st.write(f"{self.format_file_size(ds.file_size)}")
+                            with col5:
+                                st.write(f"{ds.last_accessed.strftime('%Y-%m-%d %H:%M:%S')}")
+                            with col6:
+                                with st.spinner("Loading..."):
+
+                                    action_key = f"action_{ds.id}"
+                                    action = st.selectbox(
+                                        " ",
+                                        ["Select", "View Summary", "Preprocessing", "Visualization", "Chat", "Rename", "Delete"],
+                                        key=action_key,
+                                        index=st.session_state.rename_action_state.get(ds.id, 0)
+                                    )
+    
+                                    
+    
+                                    if action == "View Summary":
+                                        self.view_dataset_summary(ds.id)
+                                    elif action == "Preprocessing":
+                                        dataset = self.dataset_db.get_dataset_by_id(ds.id, user_id)
+                                        st.session_state.df_to_preprocess = dataset.data
+                                        st.session_state.dataset_name_to_preprocess = dataset.name
+                                        st.session_state.dataset_id_to_preprocess = ds.id
+                                        st.switch_page("pages/data_preprocessing.py")
+    
+                                    elif action == "Visualization":
+                                        dataset = self.dataset_db.get_dataset_by_id(ds.id, user_id)
+                                        st.session_state.df_to_visualize = dataset.data
+                                        st.session_state.dataset_name_to_visualize = dataset.name
+                                        st.switch_page("pages/data_visualization.py")
+    
+                                    elif action == "Chat":
+                                        dataset = self.dataset_db.get_dataset_by_id(ds.id, user_id)
+                                        st.session_state.df_to_chat = dataset.data
+                                        st.session_state.dataset_name_to_chat = dataset.name
+                                        st.session_state['chat_history'] = []
+                                        st.switch_page("pages/chatbot.py")
+    
+                                    elif action == "Delete":
+                                        self.delete_dataset(ds.id)
+    
+                                    elif action == "Rename":
+                                        st.session_state.rename_action_state[ds.id] = 4
+                                        st.session_state['show_rename_dialog'] = True
+                                        st.session_state['current_rename_id'] = ds.id
+                                        st.session_state['current_rename_name'] = ds.name.split('.')[0]
+                                        st.rerun()
+                                    else:
+                                        st.session_state.rename_action_state[ds.id] = 0
+                            st.write('</div>', unsafe_allow_html=True)
+                st.write('</div>', unsafe_allow_html=True)
+
+                if not filtered_datasets:
+                    st.write(f"You don't have any datasets matching the selected filters.")
+        else:
+            with st.container(border=True):
+                st.write("You don't have any datasets uploaded. Please upload a dataset to get started.")
+
+    def view_dataset_summary(self, dataset_id):
+        user_id = st.session_state['user_id']  # Make sure to fetch datasets for the logged-in user
+        dataset = self.dataset_db.get_dataset_by_id(dataset_id, user_id)
+        if dataset:
+            data = dataset.data
+            file_format = dataset.file_format
+            if file_format == 'csv':
+                df = Dataset.try_parsing_csv(io.BytesIO(data))
+            elif file_format == 'xlsx':
+                df = pd.read_excel(io.BytesIO(data), engine='openpyxl')
+            elif file_format == 'json':
+                try:
+                    data_str = data.decode('utf-8').strip().split('\n')
+                    json_data = [json.loads(line) for line in data_str if line.strip()]
+                    df = pd.json_normalize(json_data)
+                except json.JSONDecodeError as e:
+                    st.error(f"Error parsing the JSON file: {e}")
+                    return
+            st.session_state.df = df
+            st.session_state.dataset_name = dataset.name
+            st.session_state.dataset_id = dataset_id
+            self.dataset_db.update_last_accessed(dataset_id, user_id)
+            st.switch_page("pages/dataset_summary.py")
+
+    def delete_dataset(self, dataset_id):
+        user_id = st.session_state['user_id']  # Delete datasets based on user
+        self.dataset_db.delete_dataset(dataset_id, user_id)
+        st.rerun()
+
+@st.dialog("Rename")
+def show_rename_dialog():
+    dataset_id = st.session_state['current_rename_id']
+    current_name = st.session_state['current_rename_name']
+    new_name = st.text_input("Please enter a new name for the item:", value=current_name)
+    col1, col2 = st.columns(2)
+    if col1.button("Cancel"):
+        st.session_state['show_rename_dialog'] = False
+        st.session_state.rename_action_state[dataset_id] = 0
+        st.rerun()
+    if col2.button("Rename"):
+        user_id = st.session_state['user_id']  # Ensure renaming is user-specific
+        if Dataset().dataset_exists(new_name, user_id):
+            st.error("Dataset with this name already exists.")
+        else:
+            Dataset().rename_dataset(dataset_id, new_name, user_id)
+            st.session_state['show_rename_dialog'] = False
+            st.session_state.rename_action_state[dataset_id] = 0
+            st.rerun()
+
+if 'show_rename_dialog' not in st.session_state:
+    st.session_state['show_rename_dialog'] = False
+
+if st.session_state['show_rename_dialog']:
+    show_rename_dialog()
+
+# Create an instance of the class and run the upload page
+manager = DatasetUploadManager()
+manager.dataset_upload_page()
+
+
+search_dataset.py
+import streamlit as st
+from kaggle.api.kaggle_api_extended import KaggleApi
+import os
+import tempfile
+import requests
+import json
+
+class DatasetSearch:
+    def __init__(self):
+        os.environ['KAGGLE_USERNAME'] = "hoorainhabibabbasi" 
+        os.environ['KAGGLE_KEY'] = "c6267653dad344a650deac0efd9f6e50"  
+
+        self.kaggle_api = KaggleApi()
+        self.kaggle_api.authenticate()
+
+    def load_css(self):
+        with open('static/style.css') as f:
+            css_code = f.read()
+        st.markdown(f'<style>{css_code}</style>', unsafe_allow_html=True)
+
+    def dataset_search_page(self):
+        self.load_css()
+        st.header('Search Datasets', divider='violet')
+
+        with st.container(border=True):
+            source_option = st.radio("Choose a data source", ["Kaggle", "Data.gov"], index=0)
+        with st.container(border=True):
+            search_query = st.text_input("Search Datasets", placeholder="Search datasets...", help="Enter keywords to search for datasets.")
+            if search_query:
+                if source_option == "Kaggle":
+                    kaggle_datasets = self.search_kaggle_datasets(search_query)
+                    self.display_datasets(kaggle_datasets, source='Kaggle')
+                elif source_option == "Data.gov":
+                    data_gov_datasets = self.search_data_gov_datasets(search_query)
+                    self.display_datasets(data_gov_datasets, source='Data.gov')
+            else:
+                st.write("Enter a search query to find datasets.")
+
+    def search_kaggle_datasets(self, query):
+        datasets = self.kaggle_api.dataset_list(search=query)
+        results = []
+        for ds in datasets:
+            results.append({
+                'id': ds.ref,
+                'title': ds.title,
+                'size': round(ds.totalBytes / (1024 * 1024), 2), 
+                'lastUpdated': ds.lastUpdated
+            })
+        return results
+
+    def search_data_gov_datasets(self, query):
+        url = "https://catalog.data.gov/api/3/action/package_search"
+        params = {
+            "q": query,
+            "rows": 10
+        }
+
+        response = requests.get(url, params=params)
+
+        if response.status_code == 200:
+            try:
+                datasets = response.json().get('result', {}).get('results', [])
+                results = []
+                for ds in datasets:
+                    resources = ds.get('resources', [])
+                    download_urls = []
+
+                    allowed_formats = ['CSV', 'JSON', 'XLSX']
+                    filtered_resources = [
+                        res for res in resources if res['format'].upper() in allowed_formats
+                    ]
+
+                    for res in filtered_resources:
+                        format_type = res['format'].upper()
+                        if format_type not in [fmt for fmt, url in download_urls]:
+                            download_urls.append((format_type, res.get('url', 'No direct download available.')))
+
+                    last_updated = ds.get('metadata_modified', 'N/A')
+                    formatted_last_updated = last_updated[:10] 
+
+                    results.append({
+                        'id': ds.get('id', 'N/A'),
+                        'title': ds.get('title', 'N/A'),
+                        'lastUpdated': formatted_last_updated,  
+                        'download_urls': download_urls 
+                    })
+                return results
+            except ValueError as e:
+                st.error(f"Error parsing JSON response: {e}")
+                return []
+        else:
+            st.error(f"Error fetching Data.gov datasets: {response.status_code} - {response.text}")
+            return []
+
+    def display_datasets(self, datasets, source):
+        if datasets:
+            st.write('<div class="recent-file-item">', unsafe_allow_html=True)
+            col1, col2, col3, col4 = st.columns([5, 2, 3, 3])
+            with col1:
+                st.write("**Name**")
+            if source == 'Kaggle':
+                with col2:
+                    st.write("**Size (MB)**")
+            with col3:
+                st.write("**Date**")
+            with col4:
+                st.write("**Action**")
+            st.write('</div>', unsafe_allow_html=True)
+
+            for ds in datasets:
+                st.write('<div class="recent-file-item">', unsafe_allow_html=True)
+                col1, col2, col3, col4 = st.columns([5, 2, 3, 3])
+                with col1:
+                    st.write(ds['title'])
+                if source == 'Kaggle':
+                    with col2:
+                        st.write(ds['size'])
+                with col3:
+                    st.write(ds.get('lastUpdated', 'N/A'))
+                with col4:
+                    if source == 'Kaggle':
+                        download_link = self.create_download_link(ds['id'])
+                        if download_link:
+                            st.download_button(label="Download", 
+                                               data=download_link['data'], 
+                                               file_name=download_link['file_name'], 
+                                               mime=download_link['mime'])
+                    elif source == 'Data.gov':
+                        if ds['download_urls']:
+                            selected_format = st.selectbox(
+                                f"Select format for {ds['title']}",
+                                options=[fmt for fmt, url in ds['download_urls']],
+                                key=f"{ds['id']}_selectbox" 
+                            )
+                            download_url = next(url for fmt, url in ds['download_urls'] if fmt == selected_format)
+                            
+                            if selected_format == "JSON":
+                                response = requests.get(download_url)
+                                if response.status_code == 200:
+                                    try:
+                                        json_data = response.json() 
+                                        json_str = json.dumps(json_data, indent=4)  
+                                        st.download_button(label="Download JSON", data=json_str, file_name=f"{ds['title']}.json", mime="application/json")
+                                    except json.JSONDecodeError:
+                                        st.error("Invalid JSON file format.")
+                                else:
+                                    st.error(f"Failed to download JSON file: {response.status_code}")
+                            else:
+                                st.download_button(label="Download", data=download_url, file_name=f"{ds['title']}.{selected_format.lower()}")
+                        else:
+                            st.write("No formats available.")
+                st.write('</div>', unsafe_allow_html=True)
+        else:
+            st.write("No datasets found.")
+
+    def create_download_link(self, dataset_ref):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self.kaggle_api.dataset_download_files(dataset_ref, path=temp_dir, unzip=True) 
+            files = os.listdir(temp_dir) 
+
+            if files:
+                original_file = files[0]
+                file_path = os.path.join(temp_dir, original_file)
+
+                with open(file_path, 'rb') as f:
+                    file_data = f.read()
+
+                return {
+                    "data": file_data,
+                    "file_name": original_file,  
+                    "mime": "application/octet-stream"
+                }
+
+        st.error("No files found for download.")
+        return None
+
+search_app = DatasetSearch()
+search_app.dataset_search_page()
+
+
+dataset_summary.py
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import io
+from database import Dataset  # Import the Dataset class from database.py
+
+def load_css():
+    with open('static/style.css') as f:
+        css_code = f.read()
+    st.markdown(f'<style>{css_code}</style>', unsafe_allow_html=True)
+
+class DatasetSummary:
+    def __init__(self, dataset_id):
+        """Initialize DatasetSummary with a Dataset instance, loading dataset by ID."""
+        self.dataset_db = Dataset()  # Composition: DatasetSummary owns a Dataset instance
+        self.dataset_id = dataset_id
+        self.dataset = self.load_dataset()  # Load dataset by ID
+
+    def load_dataset(self):
+        """Load dataset from the database by dataset ID and convert it to a pandas DataFrame."""
+        if 'user_id' not in st.session_state:
+            st.error("User not logged in. Please log in to view datasets.")
+            return None
+        
+        user_id = st.session_state['user_id']  # Get user ID from session state
+        dataset_record = self.dataset_db.get_dataset_by_id(self.dataset_id, user_id)  # Pass user_id
+        if dataset_record:
+            dataset_data = dataset_record.data
+            file_format = dataset_record.file_format
+            if file_format == 'csv':
+                return Dataset.try_parsing_csv(io.BytesIO(dataset_data))
+            elif file_format == 'json':
+                return Dataset.try_parsing_json(io.BytesIO(dataset_data))
+            else:
+                st.error("Unsupported file format.")
+        else:
+            st.error(f"Dataset with ID {self.dataset_id} not found.")
+            return None
+
+    def update_last_accessed(self):
+        """Update the last accessed timestamp for the current dataset."""
+        if 'user_id' not in st.session_state:
+            st.error("User not logged in. Please log in to update datasets.")
+            return
+        user_id = st.session_state['user_id']
+        self.dataset_db.update_last_accessed(self.dataset_id, user_id)
+
+    @staticmethod
+    def calculate_memory_usage(df):
+        """Calculates the memory usage of the DataFrame."""
+        return df.memory_usage(deep=True).sum()
+
+    @staticmethod
+    def is_hashable(val):
+        """Checks if a value is hashable."""
+        try:
+            hash(val)
+        except TypeError:
+            return False
+        return True
+
+    @staticmethod
+    def make_hashable(df):
+        """Converts lists and dicts in DataFrame cells to tuples so they are hashable."""
+        def convert_to_hashable(val):
+            if isinstance(val, list):
+                return tuple(val)
+            elif isinstance(val, dict):
+                return tuple(sorted(val.items()))
+            return val
+
+        return df.applymap(convert_to_hashable)
+
+    def generate_dataset_description(self, df):
+        """Generates a descriptive summary of the dataset."""
+        num_variables = df.shape[1]
+        num_observations = df.shape[0]
+        numerical_features = df.select_dtypes(include=[np.number]).columns.tolist()
+        categorical_features = df.select_dtypes(include=['object']).columns.tolist()
+        missing_cells = df.isnull().sum().sum()
+
+        hashable_df = DatasetSummary.make_hashable(df)
+        duplicate_rows = hashable_df.duplicated().sum()
+
+        description = f"""
+        The dataset contains {num_variables} variables and {num_observations} observations.
+        There are {len(numerical_features)} numerical features and {len(categorical_features)} categorical features.
+        The dataset has {missing_cells} missing cells and {duplicate_rows} duplicate rows.
+        """
+        return description
+
+    def display_summary(self):
+        """Display the summary of the dataset."""
+        df = self.dataset
+        if df is None:
+            st.error("No dataset to display summary.")
+            return
+        
+        description = self.generate_dataset_description(df)
+
+        with st.expander("Dataset"):
+            st.write(f"### Dataset Summary")
+            st.write(description)
+
+        categorical_features = df.select_dtypes(include=['object']).columns.tolist()
+        numerical_features = df.select_dtypes(include=[np.number]).columns.tolist()
+
+        warnings = []
+        for col in df.columns:
+            if df[col].isnull().sum() > 0:
+                warnings.append((col, f"{df[col].isnull().sum()} ({(df[col].isnull().sum() / df.shape[0]) * 100:.1f}%) missing values", "missing"))
+            if DatasetSummary.is_hashable(df[col].iloc[0]) and df[col].nunique() / df.shape[0] > 0.5:
+                warnings.append((col, f"high cardinality: {df[col].nunique()} distinct values", "warning"))
+            if df[col].dtype in [np.number] and df[col].skew() > 1:
+                warnings.append((col, f"highly skewed (γ1 = {df[col].skew():.2f})", "skewed"))
+
+        with st.container(border=True):
+            st.header("Overview")
+
+            overview_tab1, overview_tab2, overview_tab3, overview_tab4 = st.tabs(
+                ["Dataset Info", "Variable Types", "Variables", f"Warnings ({len(warnings)})"])
+
+            with overview_tab1:
+                st.write("##### Dataset Info")
+                num_variables = df.shape[1]
+                num_observations = df.shape[0]
+                missing_cells = df.isnull().sum().sum()
+                hashable_df = DatasetSummary.make_hashable(df)
+                duplicate_rows = hashable_df[hashable_df.duplicated()].shape[0]
+                total_size = DatasetSummary.calculate_memory_usage(df)
+                avg_record_size = total_size / num_observations
+
+                row1_col1, row1_col2 = st.columns(2)
+                row2_col1, row2_col2 = st.columns(2)
+                row3_col1, row3_col2 = st.columns(2)
+
+                with row1_col1:
+                    st.metric(label="Number of Variables", value=num_variables)
+                with row1_col2:
+                    st.metric(label="Number of Observations", value=num_observations)
+                
+                missing_delta_color = "off" if missing_cells == 0 else "inverse" if (missing_cells / (num_variables * num_observations)) * 100 > 1 else "normal"
+                with row2_col1:
+                    st.metric(label="Missing Cells", value=missing_cells, delta=f"{(missing_cells / (num_variables * num_observations)) * 100:.1f}%", delta_color=missing_delta_color)
+                
+                duplicate_delta_color = "off" if duplicate_rows == 0 else "inverse" if (duplicate_rows / num_observations) * 100 > 1 else "normal"
+                with row2_col2:
+                    st.metric(label="Duplicate Rows", value=duplicate_rows, delta=f"{(duplicate_rows / num_observations) * 100:.1f}%", delta_color=duplicate_delta_color)
+                
+                with row3_col1:
+                    st.metric(label="Total Size in Memory", value=f"{total_size / (1024 ** 2):.1f} MB")
+                with row3_col2:
+                    st.metric(label="Average Record Size in Memory", value=f"{avg_record_size:.1f} B")
+
+            with overview_tab2:
+                st.write("##### Variable Types")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Numerical", len(numerical_features))
+                    st.metric("Categorical", len(categorical_features))
+                    st.metric("Boolean", df.select_dtypes(include=['bool']).shape[1])
+                with col2:
+                    st.metric("Date", df.select_dtypes(include=['datetime']).shape[1])
+                    st.metric("Text (Unique)", df.select_dtypes(include=['category']).shape[1])
+
+            with overview_tab3:
+                st.write("##### Variables")
+                st.write(df.columns.tolist())
+
+            with overview_tab4:
+                st.write("##### Warnings")
+                if warnings:
+                    for warning in warnings:
+                        col_name, message, warning_type = warning
+                        if warning_type == "missing":
+                            st.write(f"<span style='color: red;'>{col_name}</span> {message} <span style='background-color: #f0ad4e; color: white; padding: 2px 6px; border-radius: 4px;'>Missing</span>", unsafe_allow_html=True)
+                        elif warning_type == "warning":
+                            st.write(f"<span style='color: red;'>{col_name}</span> {message} <span style='background-color: rgb(255,0,0,0.7); color: white; padding: 2px 6px; border-radius: 4px;'>Warning</span>", unsafe_allow_html=True)
+                        elif warning_type == "skewed":
+                            st.write(f"<span style='color: red;'>{col_name}</span> {message} <span style='background-color: #5bc0de; color: white; padding: 2px 6px; border-radius: 4px;'>Skewed</span>", unsafe_allow_html=True)
+                else:
+                    st.write("No warnings")
+
+        with st.container(border=True):
+            st.subheader("Numerical Features Analysis")
+
+            if numerical_features:
+                num_tab1, num_tab2, num_tab3, num_tab4, num_tab5, num_tab6, num_tab7, num_tab8, num_tab9, num_tab10 = st.tabs([
+                    "Feature Names",
+                    "Missing Values",
+                    "Unique Values",
+                    "Most Frequent Values",
+                    "Data Types",
+                    "Memory Usage",
+                    "Basic Statistics",
+                    "Correlation Matrix",
+                    "Distribution",
+                    "Histograms & Box Plots"
+                ])
+
+                with num_tab1:
+                    st.write("##### Feature Names")
+                    st.write(numerical_features)
+
+                with num_tab2:
+                    st.write("##### Missing Values")
+                    missing_tab1, missing_tab2 = st.tabs(["Table", "Visualization"])
+                    with missing_tab1:
+                        missing_values = df[numerical_features].isnull().sum().reset_index()
+                        missing_values.columns = ['Feature', 'Missing Values']
+                        missing_values['Percentage'] = (missing_values['Missing Values'] / df.shape[0]) * 100
+                        st.write(missing_values)
+                    with missing_tab2:
+                        fig = px.bar(missing_values, x='Feature', y='Missing Values', title='Missing Values Count', color_discrete_sequence=["#9933FF"])
+                        st.plotly_chart(fig, use_container_width=True)
+
+                with num_tab3:
+                    st.write("##### Unique Values")
+                    unique_tab1, unique_tab2 = st.tabs(["Table", "Visualization"])
+                    with unique_tab1:
+                        unique_values = df[numerical_features].applymap(lambda x: str(x) if not DatasetSummary.is_hashable(x) else x).nunique().reset_index()
+                        unique_values.columns = ['Feature', 'Unique Values']
+                        st.write(unique_values)
+                    with unique_tab2:
+                        fig = px.bar(unique_values, x='Feature', y='Unique Values', title='Unique Values Count', color_discrete_sequence=["#9933FF"])
+                        st.plotly_chart(fig, use_container_width=True)
+
+                with num_tab4:
+                    st.write("##### Most Frequent Values")
+                    most_frequent_values = df[numerical_features].mode().iloc[0].reset_index()
+                    most_frequent_values.columns = ['Feature', 'Most Frequent Value']
+                    st.write(most_frequent_values)
+
+                with num_tab5:
+                    st.write("##### Data Types")
+                    data_types = df[numerical_features].dtypes.reset_index()
+                    data_types.columns = ['Feature', 'Data Type']
+                    st.write(data_types)
+
+                with num_tab6:
+                    st.write("##### Memory Usage")
+                    memory_tab1, memory_tab2 = st.tabs(["Table", "Visualization"])
+                    with memory_tab1:
+                        memory_usage = df[numerical_features].memory_usage(deep=True).reset_index()
+                        memory_usage.columns = ['Feature', 'Memory Usage (Bytes)']
+                        st.write(memory_usage)
+                    with memory_tab2:
+                        fig = px.bar(memory_usage, x='Feature', y='Memory Usage (Bytes)', title='Memory Usage', color_discrete_sequence=["#9933FF"])
+                        st.plotly_chart(fig, use_container_width=True)
+
+                with num_tab7:
+                    st.write("##### Basic Statistics")
+                    if not df[numerical_features].empty:
+                        st.write(df[numerical_features].describe())
+                    else:
+                        st.write("No numerical columns found or DataFrame is empty.")
+
+                with num_tab8:
+                    st.write("##### Correlation Matrix")
+                    if len(numerical_features) > 1:
+                        corr_matrix = df[numerical_features].corr()
+                        fig = px.imshow(corr_matrix, text_auto=True, aspect="auto", color_continuous_scale="Viridis")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.write("Not enough numerical columns for correlation matrix.")
+
+                with num_tab9:
+                    st.write("##### Distribution")
+                    skew_tab, kurtosis_tab = st.tabs(["Skewness", "Kurtosis"])
+                    with skew_tab:
+                        for feature in numerical_features:
+                            skewness = df[feature].skew()
+                            st.write(f"**{feature}**: {skewness}")
+
+                    with kurtosis_tab:
+                        for feature in numerical_features:
+                            kurtosis = df[feature].kurtosis()
+                            st.write(f"**{feature}**: {kurtosis}")
+
+                with num_tab10:
+                    st.write("##### Histograms & Box Plots")
+                    feature_tabs = st.tabs(numerical_features)
+                    for feature, tab in zip(numerical_features, feature_tabs):
+                        with tab:
+                            st.write(f"### {feature}")
+                            hist_fig = px.histogram(df, x=feature, nbins=30, marginal="box", title=f"Histogram and Box Plot for {feature}", color_discrete_sequence=["#9933FF"])
+                            st.plotly_chart(hist_fig, use_container_width=True)
+            else:
+                st.write("No numerical features found in the dataset.")
+
+        with st.container(border=True):
+            st.subheader("Categorical Features Analysis")
+
+            if categorical_features:
+                cat_tab1, cat_tab2, cat_tab3, cat_tab4, cat_tab5, cat_tab6, cat_tab7 = st.tabs([
+                    "Feature Names",
+                    "Missing Values",
+                    "Unique Values",
+                    "Value Counts",
+                    "Data Types",
+                    "Top Frequent Categories",
+                    "Top N Categories"
+                ])
+
+                with cat_tab1:
+                    st.write("##### Feature Names")
+                    st.write(categorical_features)
+
+                with cat_tab2:
+                    st.write("##### Missing Values")
+                    missing_tab1, missing_tab2 = st.tabs(["Table", "Visualization"])
+                    with missing_tab1:
+                        missing_values = df[categorical_features].isnull().sum().reset_index()
+                        missing_values.columns = ['Feature', 'Missing Values']
+                        missing_values['Percentage'] = (missing_values['Missing Values'] / df.shape[0]) * 100
+                        st.write(missing_values)
+                    with missing_tab2:
+                        fig = px.bar(missing_values, x='Feature', y='Missing Values', title='Missing Values Count', color_discrete_sequence=["#9933FF"])
+                        st.plotly_chart(fig, use_container_width=True)
+
+                with cat_tab3:
+                    st.write("##### Unique Values")
+                    unique_tab1, unique_tab2 = st.tabs(["Table", "Visualization"])
+                    with unique_tab1:
+                        unique_values = df[categorical_features].applymap(lambda x: str(x) if not DatasetSummary.is_hashable(x) else x).nunique().reset_index()
+                        unique_values.columns = ['Feature', 'Unique Values']
+                        st.write(unique_values)
+                    with unique_tab2:
+                        fig = px.bar(unique_values, x='Feature', y='Unique Values', title='Unique Values Count', color_discrete_sequence=["#9933FF"])
+                        st.plotly_chart(fig, use_container_width=True)
+
+                with cat_tab4:
+                    st.write("##### Value Counts")
+                    value_tabs = st.tabs(categorical_features)
+                    for feature, tab in zip(categorical_features, value_tabs):
+                        with tab:
+                            st.write(df[feature].value_counts())
+
+                with cat_tab5:
+                    st.write("##### Data Types")
+                    data_types = df[categorical_features].dtypes.reset_index()
+                    data_types.columns = ['Feature', 'Data Type']
+                    st.write(data_types)
+
+                with cat_tab6:
+                    st.write("##### Top Frequent Categories")
+                    for feature in categorical_features:
+                        st.write(f"**{feature}**: {df[feature].value_counts().idxmax()} (Most Frequent)")
+
+                with cat_tab7:
+                    st.write("##### Top N Categories")
+                    top_n = st.slider("Select Top N", min_value=1, max_value=20, value=5)
+                    feature_tabs = st.tabs(categorical_features)
+                    for feature, tab in zip(categorical_features, feature_tabs):
+                        with tab:
+                            st.write(f"### Top {top_n} Categories for {feature}")
+                            value_counts = df[feature].value_counts().head(top_n)
+                            value_counts = value_counts.reset_index()  
+                            value_counts.columns = ['Category', 'Count']
+                            fig = px.bar(value_counts, x='Category', y='Count', title=f"Top {top_n} Categories for {feature}", color_discrete_sequence=["#9933FF"])
+                            st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.write("No categorical features found in the dataset.")
+
+        with st.container(border=True):
+            st.subheader("Data Overview")
+
+            tab1, tab2, tab3, tab4, tab5 = st.tabs([
+                "Dataset Head", 
+                "Dataset Middle", 
+                "Dataset Footer", 
+                "Full DataFrame", 
+                "Interactive Exploration"
+            ])
+    
+            with tab1:
+                st.write("##### Dataset Head")
+                st.write(df.head())
+    
+            with tab2:
+                st.write("##### Dataset Middle")
+                st.write(df.iloc[len(df)//2:len(df)//2+5])
+    
+            with tab3:
+                st.write("##### Dataset Footer")
+                st.write(df.tail())
+    
+            with tab4:
+                st.write("##### Full DataFrame")
+                st.dataframe(df)
+    
+            with tab5:
+                st.write("##### Interactive Dataset Exploration")
+                DatasetSummary.interactive_dataset_exploration(df)
+
+    @staticmethod
+    def interactive_dataset_exploration(df):
+        """Allow users to explore the dataset interactively."""
+        if df is not None:
+            col1, col2 = st.columns([1, 1])
+
+            with col1:
+                column = st.selectbox("Select column to filter by", df.columns)
+                unique_values = df[column].unique()
+
+            with col2:
+                filter_value = st.selectbox(f"Filter {column} by", unique_values)
+                filtered_df = df[df[column] == filter_value]
+
+            st.dataframe(filtered_df)
+        else:
+            st.error("No dataset loaded for exploration.")
+
+
+def dataset_summary_page():
+    load_css()
+
+    st.header('Dataset Summary', divider='violet')
+
+    # Use dataset ID from session state to initialize DatasetSummary
+    if 'dataset_id' in st.session_state:
+        dataset_id = st.session_state['dataset_id']
+        summary = DatasetSummary(dataset_id)
+
+        summary.display_summary()
+
+        col1, col2 = st.columns([5.4, 1])
+        with col1:
+            if st.button("Back to Upload", key="back_to_upload"):
+                st.session_state.uploaded = False
+                st.switch_page("pages/dataset_upload.py")
+        with col2:
+            if st.button("Go to Preprocessing", key="go_to_preprocessing"):
+                st.session_state.df_to_preprocess = summary.dataset
+                st.switch_page("pages/data_preprocessing.py")
+    else:
+        st.error("No dataset selected. Please go back and select a dataset.")
+
+dataset_summary_page()

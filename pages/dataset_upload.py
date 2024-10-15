@@ -61,7 +61,6 @@ class DatasetUploadManager:
 
         user_id = st.session_state['user_id']  # Get the logged-in user's ID
 
-        # Ensure required session state variables
         if 'uploaded' not in st.session_state:
             st.session_state.uploaded = False
         if 'show_summary_button' not in st.session_state:
@@ -69,7 +68,7 @@ class DatasetUploadManager:
         if 'rename_action_state' not in st.session_state:
             st.session_state.rename_action_state = {}
 
-        with st.container():
+        with st.container(border=True):
             uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx", "json"], key="uploaded_file")
 
             if uploaded_file is not None:
@@ -79,16 +78,16 @@ class DatasetUploadManager:
                 data = uploaded_file.getvalue()
 
                 # Check if the dataset already exists for the user
-                if self.dataset_db.dataset_exists(file_name, user_id):
+                if self.dataset_db.dataset_exists(file_name, user_id):  # Pass user_id to check ownership
                     st.warning("Dataset with this name already exists.")
                 else:
                     try:
                         with st.spinner("Loading..."):
-                            progress_text = st.empty()
-                            progress_bar = st.progress(0)
-                            for percent_complete in range(0, 101, 10):
-                                progress_bar.progress(percent_complete)
-                                progress_text.text(f"{percent_complete}%")
+                            # progress_text = st.empty()
+                            # progress_bar = st.progress(0)
+                            # for percent_complete in range(0, 101, 10):
+                            #     progress_bar.progress(percent_complete)
+                            #     progress_text.text(f"{percent_complete}%")
 
                             # Handle different file formats
                             if file_format == 'csv':
@@ -116,12 +115,12 @@ class DatasetUploadManager:
                             # Save the dataset to the database with user_id
                             st.session_state.df = df
                             st.session_state.dataset_name = file_name
-                            self.dataset_db.save_to_database(file_name, file_format, file_size, data, user_id)
+                            self.dataset_db.save_to_database(file_name, file_format, file_size, data, user_id)  # Pass user_id to save
                             st.success("Dataset uploaded successfully!")
                             st.session_state.uploaded = True
                             st.session_state.show_summary_button = True
-                            progress_text.text("")
-                            progress_bar.empty()
+                            # progress_text.text("")
+                            # progress_bar.empty()
 
                     except pd.errors.ParserError as e:
                         st.error(f"Error parsing the file: {e}")
@@ -133,17 +132,12 @@ class DatasetUploadManager:
                         st.error(f"Error reading the file: {e}")
                         return
 
-        # If the upload was successful, show the summary button
-        if st.session_state.show_summary_button:
-            if st.button("View Data Summary"):
-                st.session_state.show_summary_button = False
-                st.switch_page("pages/dataset_summary.py")
 
         # Fetch datasets for the logged-in user
-        datasets_list = self.dataset_db.fetch_datasets(user_id)
+        datasets_list = self.dataset_db.fetch_datasets(user_id)  # Pass the user_id to fetch datasets
 
         if datasets_list:
-            with st.container():
+            with st.container(border=True):
                 st.write("### Recently Uploaded Datasets")
                 search_query = st.text_input("Search Datasets", placeholder="Search...", help="Enter keywords to search for datasets")
 
@@ -156,7 +150,7 @@ class DatasetUploadManager:
                     filter_date = st.date_input("Filter by Date", value=(datetime.date(2024, 1, 1), datetime.date.today()), key="date_filter")
 
             # Filter datasets based on user search and filters
-            with st.container():
+            with st.container(border=True):
                 st.write('<div class="recent-files">', unsafe_allow_html=True)
                 col1, col2, col3, col4, col5 = st.columns([7, 3, 3, 4, 3])
                 with col1:
@@ -206,55 +200,60 @@ class DatasetUploadManager:
                                 st.write(f"{self.format_file_size(ds.file_size)}")
                             with col5:
                                 st.write(f"{ds.last_accessed.strftime('%Y-%m-%d %H:%M:%S')}")
-
                             with col6:
-                                action_key = f"action_{ds.id}"
-                                action = st.selectbox(
-                                    " ",
-                                    ["Select", "View Summary", "Preprocessing", "Visualization", "Chat", "Rename", "Delete"],
-                                    key=action_key,
-                                    index=st.session_state.rename_action_state.get(ds.id, 0)
-                                )
+                                with st.spinner("Loading..."):
 
-                                # Action handling
-                                if action == "View Summary":
-                                    self.view_dataset_summary(ds.id)
-                                elif action == "Preprocessing":
-                                    dataset = self.dataset_db.get_dataset_by_id(ds.id, user_id)
-                                    st.session_state.df_to_preprocess = dataset.data
-                                    st.session_state.dataset_name_to_preprocess = dataset.name
-                                    st.session_state.dataset_id_to_preprocess = ds.id
-                                    st.switch_page("pages/data_preprocessing.py")
-
-                                elif action == "Visualization":
-                                    dataset = self.dataset_db.get_dataset_by_id(ds.id, user_id)
-                                    st.session_state.df_to_visualize = dataset.data
-                                    st.session_state.dataset_name_to_visualize = dataset.name
-                                    st.switch_page("pages/data_visualization.py")
-
-                                elif action == "Chat":
-                                    dataset = self.dataset_db.get_dataset_by_id(ds.id, user_id)
-                                    st.session_state.df_to_chat = dataset.data
-                                    st.session_state.dataset_name_to_chat = dataset.name
-                                    st.session_state['chat_history'] = []
-                                    st.switch_page("pages/chatbot.py")
-
-                                elif action == "Delete":
-                                    self.delete_dataset(ds.id)
-
-                                elif action == "Rename":
-                                    st.session_state.rename_action_state[ds.id] = 4
-                                    st.session_state['show_rename_dialog'] = True
-                                    st.session_state['current_rename_id'] = ds.id
-                                    st.session_state['current_rename_name'] = ds.name.split('.')[0]
-                                    st.rerun()
-
+                                    action_key = f"action_{ds.id}"
+                                    action = st.selectbox(
+                                        " ",
+                                        ["Select", "View Summary", "Preprocessing", "Visualization", "Chat", "Rename", "Delete"],
+                                        key=action_key,
+                                        index=st.session_state.rename_action_state.get(ds.id, 0)
+                                    )
+    
+                                    
+    
+                                    if action == "View Summary":
+                                        self.view_dataset_summary(ds.id)
+                                    elif action == "Preprocessing":
+                                        dataset = self.dataset_db.get_dataset_by_id(ds.id, user_id)
+                                        st.session_state.df_to_preprocess = dataset.data
+                                        st.session_state.dataset_name_to_preprocess = dataset.name
+                                        st.session_state.dataset_id_to_preprocess = ds.id
+                                        st.switch_page("pages/data_preprocessing.py")
+    
+                                    elif action == "Visualization":
+                                        dataset = self.dataset_db.get_dataset_by_id(ds.id, user_id)
+                                        st.session_state.df_to_visualize = dataset.data
+                                        st.session_state.dataset_name_to_visualize = dataset.name
+                                        st.switch_page("pages/data_visualization.py")
+    
+                                    elif action == "Chat":
+                                        dataset = self.dataset_db.get_dataset_by_id(ds.id, user_id)
+                                        st.session_state.df_to_chat = dataset.data
+                                        st.session_state.dataset_name_to_chat = dataset.name
+                                        st.session_state['chat_history'] = []
+                                        st.switch_page("pages/chatbot.py")
+    
+                                    elif action == "Delete":
+                                        self.delete_dataset(ds.id)
+    
+                                    elif action == "Rename":
+                                        st.session_state.rename_action_state[ds.id] = 4
+                                        st.session_state['show_rename_dialog'] = True
+                                        st.session_state['current_rename_id'] = ds.id
+                                        st.session_state['current_rename_name'] = ds.name.split('.')[0]
+                                        st.rerun()
+                                    else:
+                                        st.session_state.rename_action_state[ds.id] = 0
                             st.write('</div>', unsafe_allow_html=True)
+                st.write('</div>', unsafe_allow_html=True)
 
                 if not filtered_datasets:
                     st.write(f"You don't have any datasets matching the selected filters.")
         else:
-            st.write("You don't have any datasets uploaded. Please upload a dataset to get started.")
+            with st.container(border=True):
+                st.write("You don't have any datasets uploaded. Please upload a dataset to get started.")
 
     def view_dataset_summary(self, dataset_id):
         user_id = st.session_state['user_id']  # Make sure to fetch datasets for the logged-in user
@@ -285,7 +284,6 @@ class DatasetUploadManager:
         self.dataset_db.delete_dataset(dataset_id, user_id)
         st.rerun()
 
-# Handle Rename Dialog
 @st.dialog("Rename")
 def show_rename_dialog():
     dataset_id = st.session_state['current_rename_id']

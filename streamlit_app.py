@@ -3,7 +3,7 @@ from st_pages import Page
 import auth
 
 # Set page configuration as the first command
-st.set_page_config(page_title="InsightPilot", page_icon="🧠")
+# st.set_page_config(page_title="InsightPilot", page_icon="🧠")
 
 # Session state for user authentication
 if 'user_id' not in st.session_state:
@@ -23,11 +23,12 @@ if st.session_state.authenticated:
 # Define the pages for the app
 pages = [
     st.Page("pages/dataset_upload.py", title="Dataset Upload", icon="⬆️"),
-    st.Page("pages/search_dataset.py", title="Search Dataset", icon="🔍"),
     st.Page("pages/dataset_summary.py", title="Dataset Summary", icon="📊"),
     st.Page("pages/data_preprocessing.py", title="Data Preprocessing", icon="🔧"),
     st.Page("pages/data_visualization.py", title="Data Visualization", icon="📈"),
-    st.Page("pages/chatbot.py", title="Chatbot", icon="🤖")
+    st.Page("pages/chatbot.py", title="Chatbot", icon="🤖"),
+    st.Page("pages/search_dataset.py", title="Search Dataset", icon="🔍")
+
 ]
 
 # If user is not authenticated, display the authentication page

@@ -27,7 +27,84 @@ users = Table(
 )
 metadata.create_all(engine)
 
-class Auth:
+hide_css = """
+    <style>
+    .st-emotion-cache-15ecox0 {
+        position: absolute;
+        top: 1.25rem;
+        right: 1.25rem;
+        display: flex;
+        flex-direction: row;
+        -webkit-box-align: center;
+        align-items: center;
+        visibility: hidden;
+    }
+
+    .st-emotion-cache-xtjyj5{
+        background-color: #9645ff;
+        color: white;
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+        padding: 6px 7px;
+        border-radius: 6px;
+        color: #333;
+        font-weight: 300;
+      }
+      
+      .st-emotion-cache-1rtdyuf {
+        color: white;
+      }
+      
+      .st-emotion-cache-qubd7b {
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+        padding: 6px 7px;
+        border-radius: 6px;
+        color: #333;
+        /* font-weight: 600; */
+        background-color: transparent; /* Remove individual backgrounds */
+      }
+      
+      .st-emotion-cache-xtjyj5:hover, .st-emotion-cache-qubd7b:hover {
+        background-color: #9645ff; /* Hover background color */
+        color: white; /* White text on hover */
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+        padding: 6px 7px;
+        border-radius: 6px;
+        color: #333;
+        font-weight: 300;
+      }
+      
+      .st-emotion-cache-6tkfeg:hover {
+        color: white;
+      }
+      
+      .st-emotion-cache-1kyxreq {
+        margin-top: -415px;
+      }
+      
+      .st-emotion-cache-79elbk {
+        margin-top: 45px;
+      }
+    
+      .st-emotion-cache-1eo1tir {
+        width: 100%;
+        padding: 6rem 1rem 1rem;
+        max-width: 60rem;
+    }
+    
+
+    </style>
+    """
+
+st.markdown(hide_css, unsafe_allow_html=True)
+
+class User:
     def __init__(self):
         self.users = users
         self.Session = sessionmaker(bind=engine)
@@ -120,7 +197,7 @@ def is_valid_password(password):
     return True
 
 def display_auth_page():
-    auth = Auth()
+    user = User()
 
     st.header("Welcome to InsightPilot", divider='violet')
 
@@ -132,7 +209,7 @@ def display_auth_page():
     
             # Check for username availability in real-time
             def check_username():
-                if auth.check_username_exists(st.session_state.register_username):
+                if user.check_username_exists(st.session_state.register_username):
                     st.session_state.username_available = False
                 else:
                     st.session_state.username_available = True
@@ -141,7 +218,7 @@ def display_auth_page():
             def check_email():
                 if not is_valid_email(st.session_state.register_email):
                     st.session_state.email_valid = False
-                elif auth.check_email_exists(st.session_state.register_email):
+                elif user.check_email_exists(st.session_state.register_email):
                     st.session_state.email_available = False
                 else:
                     st.session_state.email_valid = True
@@ -207,7 +284,7 @@ def display_auth_page():
     
             # Only allow registration if username and email are available and passwords match
             if st.button("Register", key="register_button", disabled=register_disabled):
-                if auth.register_user(username, email, password):
+                if user.register_user(username, email, password):
                     st.success("Registration successful. You can now login.")
                 else:
                     st.error("Registration failed. Please try again.")
@@ -218,9 +295,9 @@ def display_auth_page():
             password = st.text_input("Password", type="password", key="login_password")
     
             if st.button("Login", key="login_button"):
-                user = auth.authenticate_user(user_identifier, password)
-                if user:
-                    st.session_state.user_id = user[0]
+                authenticated_user = user.authenticate_user(user_identifier, password)
+                if authenticated_user:
+                    st.session_state.user_id = authenticated_user[0]
                     st.session_state.authenticated = True
                     # Use query params to reload the page
                     st.query_params.from_dict({"reload": "true"})
