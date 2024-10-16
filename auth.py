@@ -23,7 +23,6 @@ users = Table(
     Column('username', String, unique=True, nullable=False),
     Column('email', String, unique=True, nullable=False),
     Column('password', String, nullable=False),
-    Column('is_verified', Boolean, default=False)
 )
 metadata.create_all(engine)
 
