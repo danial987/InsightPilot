@@ -1,0 +1,74 @@
+.st-emotion-cache-13ln4jf {
+  padding: 2rem 2rem 2rem;
+  max-width: 92rem;
+}
+
+.st-emotion-cache-xtjyj5{
+    background-color: #9645ff;
+    color: white;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    padding: 6px 7px;
+    border-radius: 6px;
+    color: #333;
+    font-weight: 300;
+  }
+  
+  .st-emotion-cache-1rtdyuf {
+    color: white;
+  }
+  
+  .st-emotion-cache-qubd7b {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    padding: 6px 7px;
+    border-radius: 6px;
+    color: #333;
+    background-color: transparent;
+  }
+  
+  .st-emotion-cache-xtjyj5:hover, .st-emotion-cache-qubd7b:hover {
+    background-color: #9645ff; 
+    color: white; 
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    padding: 6px 7px;
+    border-radius: 6px;
+    color: #333;
+    font-weight: 300;
+  }
+  
+  .st-emotion-cache-6tkfeg:hover {
+    color: white;
+  }
+  
+  .st-emotion-cache-1kyxreq {
+    margin-top: -415px;
+  }
+  
+  .st-emotion-cache-79elbk {
+    margin-top: 45px;
+  }
+
+  .st-emotion-cache-1eo1tir {
+    width: 100%;
+    padding: 6rem 1rem 1rem;
+    max-width: 60rem;
+}
+
+#MainMenu,
+header, footer  {
+  visibility: hidden;
+}
+
+._link_gzau3_10 {
+  visibility: hidden;
+}
+
+._profileContainer_gzau3_53 {
+  visibility: hidden;
+}

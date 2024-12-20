@@ -1,0 +1,92 @@
+user_authentication
+
+test_authenticate_user, 2
+test_register_user , 2
+test_check_email_exists , 2
+test_check_username_exists , 2
+test_is_valid_email , 1
+test_is_valid_password , 1
+test_logout_user , 1
+
+
+dataset
+
+test_dataset_exists.py , 2
+test_dataset.py , 3
+
+
+dataset_upload 
+
+test_file_size_above_limit , 1
+test_file_upload_empty , 3
+test_file_upload_success , 3
+
+test_format_validation , 3
+test_invalid_format , 4
+test_try_parsing_csv , 2
+test_try_parsing_json , 2
+
+
+dataset_summary
+
+test_display_warnings_for_high_cardinality , 1
+test_display_warnings_for_missing_values , 1
+test_display_warnings_for_skewed_columns , 1
+
+
+chatbot
+
+test_call_openai_with_error , 1
+test_call_openai_with_valid_prompt , 1
+
+
+search_dataset
+
+test_datagov_api_authentication , 2
+test_datagov_dataset_search , 2
+test_kaggle_api_authentication , 2
+test_kaggle_dataset_search , 2
+
+
+
+Total 47 Test Cases 
+Hoorain 24
+Mohsin 23
+
+
+
+data_visualization
+
+test_count_plot , 2
+test_pie_chart , 3
+test_bar_chart , 4
+test_line_chart , 5
+test_scatter_plot , 5
+test_box_plot , 4
+test_histogram , 4
+test_correlation_matrix , 5
+test_heatmap , 5
+test_mosaic_plot , 4 
+test_tree_map , 6
+test_density_plot , 5
+test_3d_cone_plot , 3
+test_streamline_plot , 3
+
+Total = 58
+
+
+data_preprocessing
+
+test_remove_duplicates , 3
+test_fill_missing_values , 3
+test_scale_features , 3
+test_encode_data , 3
+test_handle_imbalanced_data , 3
+test_handle_outliers , 4
+test_delete_features , 4
+
+Total = 23
+
+
+Total = 128
+
